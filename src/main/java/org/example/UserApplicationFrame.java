@@ -18,6 +18,7 @@ class UserApplicationFrame extends JFrame {
     private JPanel tasksPanel;
     private String username;
     private List<Task> userTasks;
+    private List<Task> allUsersTasks;
 
     public UserApplicationFrame(String token, Map<String, Object> userInfo) {
         this.authToken = token;
@@ -35,9 +36,6 @@ class UserApplicationFrame extends JFrame {
         cardLayout = new CardLayout();
         centerPanel = new JPanel(cardLayout);
 
-        // Загружаем задачи для статистики
-        loadUserTasksForStatistics();
-
         JPanel welcomePanel = createWelcomePanel();
         tasksPanel = new JPanel(new BorderLayout());
 
@@ -48,6 +46,8 @@ class UserApplicationFrame extends JFrame {
         contentPane.add(centerPanel, BorderLayout.CENTER);
         add(contentPane);
 
+        loadUserTasksForStatistics();
+
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
@@ -56,41 +56,20 @@ class UserApplicationFrame extends JFrame {
         });
     }
 
-    private void loadUserTasksForStatistics() {
-        new Thread(() -> {
-            try {
-                User user = getUserWithTasks();
-                if (user != null && user.getTasks() != null) {
-                    userTasks = user.getTasks();
-                    // Обновляем статистику на главной панели
-                    SwingUtilities.invokeLater(() -> {
-                        centerPanel.revalidate();
-                        centerPanel.repaint();
-                    });
-                }
-            } catch (Exception e) {
-                System.out.println("Ошибка загрузки задач для статистики: " + e.getMessage());
-            }
-        }).start();
-    }
-
     private JPanel createWelcomePanel() {
         JPanel welcomePanel = new JPanel(new BorderLayout());
         welcomePanel.setBackground(new Color(248, 249, 250));
         welcomePanel.setBorder(BorderFactory.createEmptyBorder(30, 40, 40, 40));
 
-        // Основной контент
         JPanel contentPanel = new JPanel();
         contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
         contentPanel.setBackground(new Color(248, 249, 250));
 
-        // Заголовок
         JLabel titleLabel = new JLabel("Добро пожаловать в ваш личный кабинет!", SwingConstants.CENTER);
         titleLabel.setFont(new Font("Arial", Font.BOLD, 32));
         titleLabel.setForeground(new Color(33, 37, 41));
         titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        // Описание
         JTextArea descriptionArea = new JTextArea();
         descriptionArea.setEditable(false);
         descriptionArea.setFont(new Font("Arial", Font.PLAIN, 16));
@@ -102,7 +81,6 @@ class UserApplicationFrame extends JFrame {
                 "и отслеживать выполнение поставленных целей.\n");
         descriptionArea.setBorder(BorderFactory.createEmptyBorder(20, 50, 30, 50));
 
-        // Панель статистики
         JPanel statsPanel = createStatsPanel();
 
         contentPanel.add(titleLabel);
@@ -115,77 +93,33 @@ class UserApplicationFrame extends JFrame {
         return welcomePanel;
     }
 
-    private JPanel createStatsPanel() {
-        JPanel statsPanel = new JPanel();
-        statsPanel.setLayout(new BoxLayout(statsPanel, BoxLayout.Y_AXIS));
-        statsPanel.setBackground(new Color(248, 249, 250));
-
-        // Заголовок статистики
-        JLabel statsTitle = new JLabel("Статистика задач", SwingConstants.CENTER);
-        statsTitle.setFont(new Font("Arial", Font.BOLD, 24));
-        statsTitle.setForeground(new Color(33, 37, 41));
-        statsTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        // Контейнер для карточек - ВЕРНУЛ НОРМАЛЬНЫЕ РАЗМЕРЫ
-        JPanel cardsContainer = new JPanel();
-        cardsContainer.setLayout(new GridLayout(1, 4, 20, 0));
-        cardsContainer.setBackground(new Color(248, 249, 250));
-        cardsContainer.setMaximumSize(new Dimension(1000, 190)); // Вернул нормальную высоту
-        cardsContainer.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        // Получаем статистику
-        int totalTasks = getUserTasksCount();
-        int notStarted = getTasksCountByStatus("НЕ_НАЧАТА");
-        int inProgress = getTasksCountByStatus("В_ПРОЦЕССЕ");
-        int completed = getTasksCountByStatus("ВЫПОЛНЕНА");
-
-        // Создаем карточки
-        cardsContainer.add(createStatCard("Всего задач", String.valueOf(totalTasks),
-                new Color(52, 152, 219), "📋"));
-        cardsContainer.add(createStatCard("Не начаты", String.valueOf(notStarted),
-                new Color(241, 196, 15), "⏳"));
-        cardsContainer.add(createStatCard("В процессе", String.valueOf(inProgress),
-                new Color(155, 89, 182), "🚀"));
-        cardsContainer.add(createStatCard("Выполнено", String.valueOf(completed),
-                new Color(46, 204, 113), "✅"));
-
-        statsPanel.add(statsTitle);
-        statsPanel.add(Box.createVerticalStrut(20)); // Вернул нормальный отступ
-        statsPanel.add(cardsContainer);
-
-        return statsPanel;
-    }
-
     private JPanel createStatCard(String title, String value, Color color, String icon) {
         JPanel card = new JPanel();
         card.setLayout(new BorderLayout());
         card.setBackground(Color.WHITE);
         card.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(color.brighter(), 2),
-                BorderFactory.createEmptyBorder(20, 15, 20, 15) // Вернул нормальные отступы
+                BorderFactory.createEmptyBorder(20, 15, 20, 15)
         ));
-        card.setPreferredSize(new Dimension(200, 170)); // Вернул нормальный размер
+        card.setPreferredSize(new Dimension(200, 170));
         card.setMaximumSize(new Dimension(200, 150));
 
-        // Верхняя часть с иконкой - УМЕНЬШИЛ ТОЛЬКО ЗДЕСЬ
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         topPanel.setBackground(Color.WHITE);
         topPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
         JLabel iconLabel = new JLabel(icon);
-        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 24)); // Уменьшил только иконку (было 32)
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 24));
         iconLabel.setForeground(color);
         topPanel.add(iconLabel);
 
-        // Центральная часть с числом - оставляем большим
         JLabel valueLabel = new JLabel(value);
-        valueLabel.setFont(new Font("Arial", Font.BOLD, 36)); // Оставил большой шрифт
+        valueLabel.setFont(new Font("Arial", Font.BOLD, 36));
         valueLabel.setForeground(color);
         valueLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
-        // Нижняя часть с названием - оставляем нормальным
         JLabel titleLabel = new JLabel(title);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 14)); // Оставил нормальный шрифт
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
         titleLabel.setForeground(new Color(108, 117, 125));
         titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
@@ -193,7 +127,6 @@ class UserApplicationFrame extends JFrame {
         card.add(valueLabel, BorderLayout.CENTER);
         card.add(titleLabel, BorderLayout.SOUTH);
 
-        // Эффекты при наведении
         card.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseEntered(java.awt.event.MouseEvent evt) {
                 card.setBackground(color.brighter().brighter());
@@ -216,19 +149,6 @@ class UserApplicationFrame extends JFrame {
         return card;
     }
 
-    private int getUserTasksCount() {
-        return userTasks != null ? userTasks.size() : 0;
-    }
-
-    private int getTasksCountByStatus(String status) {
-        if (userTasks == null) return 0;
-
-        return (int) userTasks.stream()
-                .filter(task -> task.getStatus() != null && task.getStatus().equals(status))
-                .count();
-    }
-
-    // Остальные методы остаются без изменений, только добавляем геттер для userTasks
     private String extractUsernameFromUserInfo(Map<String, Object> userInfo) {
         if (userInfo == null) return "user";
 
@@ -306,8 +226,6 @@ class UserApplicationFrame extends JFrame {
         return rightPanel;
     }
 
-
-
     private JPanel loadTasksPanel() {
         JPanel tasksPanel = new JPanel(new BorderLayout());
         tasksPanel.setBackground(Color.WHITE);
@@ -364,30 +282,6 @@ class UserApplicationFrame extends JFrame {
         }).start();
     }
 
-    private User getUserWithTasks() {
-        try {
-            String encodedUsername = java.net.URLEncoder.encode(this.username, "UTF-8");
-            String url = "http://localhost:8080/user?username=" + encodedUsername;
-
-            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(new java.net.URI(url))
-                    .header("Authorization", "Bearer " + authToken)
-                    .header("Content-Type", "application/json")
-                    .GET().build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 200) {
-                return parseUserFromJson(response.body());
-            } else {
-                throw new RuntimeException("HTTP error: " + response.statusCode());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Ошибка при получении задач: " + e.getMessage());
-        }
-    }
-
     private void displayTasks(JPanel tasksPanel, List<Task> tasks, boolean showUsername) {
         JPanel tasksContentPanel = new JPanel();
         tasksContentPanel.setLayout(new BoxLayout(tasksContentPanel, BoxLayout.Y_AXIS));
@@ -406,7 +300,7 @@ class UserApplicationFrame extends JFrame {
     }
 
     private JPanel createTableHeader(boolean showUsername) {
-        int columns = showUsername ? 5 : 4;
+        int columns = showUsername ? 6 : 5; // Добавляем колонку для комментариев
         JPanel headerPanel = new JPanel(new GridLayout(1, columns, 10, 5));
         headerPanel.setBackground(new Color(240, 240, 240));
         headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
@@ -419,7 +313,7 @@ class UserApplicationFrame extends JFrame {
             headerPanel.add(userHeaderLabel);
         }
 
-        String[] headers = {"Название задачи", "Статус", "Приоритет", "Дедлайн"};
+        String[] headers = {"Название задачи", "Статус", "Приоритет", "Дедлайн", "Комментарии"};
         for (String header : headers) {
             JLabel headerLabel = new JLabel(header);
             headerLabel.setFont(new Font("Arial", Font.BOLD, 12));
@@ -431,7 +325,7 @@ class UserApplicationFrame extends JFrame {
     }
 
     private void addTaskRow(JPanel parent, Task task, boolean showUsername, String username) {
-        int columns = showUsername ? 5 : 4;
+        int columns = showUsername ? 6 : 5; // Добавляем колонку для комментариев
         JPanel taskRow = new JPanel(new GridLayout(1, columns, 10, 5));
         taskRow.setBackground(Color.WHITE);
         taskRow.setBorder(BorderFactory.createCompoundBorder(
@@ -455,17 +349,101 @@ class UserApplicationFrame extends JFrame {
         statusLabel.setForeground(getStatusColor(task.getStatus()));
         taskRow.add(statusLabel);
 
-        JLabel priorityLabel = new JLabel(task.getImportance() != null ? task.getImportance() : "");
+        JLabel priorityLabel = new JLabel(task.getImportance() != null ? task.getImportance().toString() : "");
         priorityLabel.setFont(new Font("Arial", Font.PLAIN, 12));
         taskRow.add(priorityLabel);
 
-        String deadline = task.getDeadline() != null ? task.getDeadline() : "";
+        String deadline = task.getDeadline() != null ? task.getDeadline().toString() : "";
         if (deadline.contains("T")) deadline = deadline.substring(0, deadline.indexOf("T"));
         JLabel deadlineLabel = new JLabel(deadline);
         deadlineLabel.setFont(new Font("Arial", Font.PLAIN, 12));
         taskRow.add(deadlineLabel);
 
+        // Колонка комментариев
+        int commentCount = task.getComments() != null ? task.getComments().size() : 0;
+        JLabel commentsLabel = new JLabel(commentCount + " коммент.");
+        commentsLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        commentsLabel.setForeground(commentCount > 0 ? new Color(52, 152, 219) : Color.GRAY);
+        taskRow.add(commentsLabel);
+
+        // Добавляем возможность просмотра комментариев
+        if (commentCount > 0) {
+            taskRow.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            taskRow.addMouseListener(new java.awt.event.MouseAdapter() {
+                public void mouseClicked(java.awt.event.MouseEvent evt) {
+                    showTaskComments(task);
+                }
+            });
+        }
+
         parent.add(taskRow);
+    }
+
+    private void showTaskComments(Task task) {
+        JDialog commentsDialog = new JDialog(this, "Комментарии к задаче: " + task.getTitle(), true);
+        commentsDialog.setSize(500, 400);
+        commentsDialog.setLocationRelativeTo(this);
+        commentsDialog.setLayout(new BorderLayout());
+
+        JPanel contentPanel = new JPanel(new BorderLayout());
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Заголовок
+        JLabel titleLabel = new JLabel("Комментарии к задаче: " + task.getTitle(), SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 16));
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+        contentPanel.add(titleLabel, BorderLayout.NORTH);
+
+        // Список комментариев
+        JPanel commentsListPanel = new JPanel();
+        commentsListPanel.setLayout(new BoxLayout(commentsListPanel, BoxLayout.Y_AXIS));
+        commentsListPanel.setBackground(Color.WHITE);
+
+        if (task.getComments() != null && !task.getComments().isEmpty()) {
+            for (Comment comment : task.getComments()) {
+                JPanel commentPanel = createCommentPanel(comment);
+                commentsListPanel.add(commentPanel);
+                commentsListPanel.add(Box.createVerticalStrut(5));
+            }
+        } else {
+            JLabel noCommentsLabel = new JLabel("Комментарии отсутствуют", SwingConstants.CENTER);
+            noCommentsLabel.setFont(new Font("Arial", Font.ITALIC, 14));
+            noCommentsLabel.setForeground(Color.GRAY);
+            commentsListPanel.add(noCommentsLabel);
+        }
+
+        JScrollPane scrollPane = new JScrollPane(commentsListPanel);
+        scrollPane.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200)));
+        contentPanel.add(scrollPane, BorderLayout.CENTER);
+
+        // Кнопка закрытия
+        JButton closeButton = new JButton("Закрыть");
+        closeButton.addActionListener(e -> commentsDialog.dispose());
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(closeButton);
+        contentPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+        commentsDialog.add(contentPanel);
+        commentsDialog.setVisible(true);
+    }
+
+    private JPanel createCommentPanel(Comment comment) {
+        JPanel commentPanel = new JPanel(new BorderLayout());
+        commentPanel.setBackground(new Color(248, 249, 250));
+        commentPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                BorderFactory.createEmptyBorder(10, 10, 10, 10)
+        ));
+
+        JTextArea commentText = new JTextArea(comment.getDescription() != null ? comment.getDescription() : "");
+        commentText.setEditable(false);
+        commentText.setLineWrap(true);
+        commentText.setWrapStyleWord(true);
+        commentText.setBackground(new Color(248, 249, 250));
+        commentText.setFont(new Font("Arial", Font.PLAIN, 12));
+
+        commentPanel.add(commentText, BorderLayout.CENTER);
+        return commentPanel;
     }
 
     private void showNoTasksMessage(JPanel tasksPanel) {
@@ -571,49 +549,6 @@ class UserApplicationFrame extends JFrame {
         allTasksPanel.add(scrollPane, BorderLayout.CENTER);
     }
 
-    private List<User> getAllUsersWithTasks() {
-        try {
-            String url = "http://localhost:8080/allusers";
-            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(new java.net.URI(url))
-                    .header("Authorization", "Bearer " + authToken)
-                    .header("Content-Type", "application/json")
-                    .GET().build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 200) {
-                return parseUsersFromJson(response.body());
-            } else {
-                throw new RuntimeException("HTTP error: " + response.statusCode());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Ошибка при получении всех пользователей: " + e.getMessage());
-        }
-    }
-
-    // JSON Parsing methods
-    private List<User> parseUsersFromJson(String json) {
-        try {
-            List<User> users = new ArrayList<>();
-            if (json == null || json.trim().isEmpty()) return users;
-
-            String content = json.substring(1, json.length() - 1).trim();
-            List<String> userObjects = splitJsonObjects(content);
-
-            for (String userObj : userObjects) {
-                User user = parseSingleUser(userObj);
-                if (user != null && user.getUsername() != null) {
-                    users.add(user);
-                }
-            }
-            return users;
-        } catch (Exception e) {
-            return new ArrayList<>();
-        }
-    }
-
     private List<String> splitJsonObjects(String json) {
         List<String> objects = new ArrayList<>();
         int start = -1;
@@ -657,84 +592,41 @@ class UserApplicationFrame extends JFrame {
         }
     }
 
-    private List<Task> parseTasksArray(String tasksJson) {
-        List<Task> tasks = new ArrayList<>();
+    private List<Comment> parseCommentsArray(String commentsJson) {
+        List<Comment> comments = new ArrayList<>();
         try {
-            if (tasksJson == null || tasksJson.trim().isEmpty()) return tasks;
+            if (commentsJson == null || commentsJson.trim().isEmpty()) return comments;
 
-            List<String> taskObjects = splitJsonObjects(tasksJson);
-            for (String taskObj : taskObjects) {
-                Task task = parseSingleTask(taskObj);
-                if (task != null && task.getTitle() != null) {
-                    tasks.add(task);
+            List<String> commentObjects = splitJsonObjects(commentsJson);
+            for (String commentObj : commentObjects) {
+                Comment comment = parseSingleComment(commentObj);
+                if (comment != null) {
+                    comments.add(comment);
                 }
             }
         } catch (Exception e) {
-            // Ignore parsing errors
+            System.out.println("DEBUG: Error parsing comments: " + e.getMessage());
         }
-        return tasks;
+        return comments;
     }
 
-    private Task parseSingleTask(String taskJson) {
+    private Comment parseSingleComment(String commentJson) {
         try {
-            String title = extractValue(taskJson, "title");
-            String description = extractValue(taskJson, "description");
-            String status = extractValue(taskJson, "status");
-            String importance = extractValue(taskJson, "importance");
-            String deadline = extractValue(taskJson, "deadline");
+            String idStr = extractValue(commentJson, "id");
+            String description = extractValue(commentJson, "description");
 
-            if (title != null) {
-                return new Task(title, description, status, importance, deadline);
+            if (description != null) {
+                Comment comment = new Comment();
+                if (idStr != null) {
+                    comment.setId(Long.parseLong(idStr));
+                }
+                comment.setDescription(description);
+                return comment;
             }
         } catch (Exception e) {
-            // Ignore parsing errors
+            System.out.println("DEBUG: Error parsing comment: " + e.getMessage());
         }
         return null;
-    }
-
-    private String extractValue(String json, String key) {
-        try {
-            String searchStr = "\"" + key + "\":\"";
-            int start = json.indexOf(searchStr);
-            if (start == -1) return null;
-
-            start += searchStr.length();
-            int end = json.indexOf("\"", start);
-            if (end == -1) return null;
-
-            return json.substring(start, end);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private User parseUserFromJson(String json) {
-        try {
-            if (json.contains("\"tasks\"")) {
-                User user = new User();
-                List<Task> tasks = new ArrayList<>();
-
-                String tasksPart = json.substring(json.indexOf("\"tasks\":[") + 8);
-                tasksPart = tasksPart.substring(0, tasksPart.indexOf("]"));
-
-                String[] taskStrings = tasksPart.split("\\},\\s*\\{");
-                for (int i = 0; i < taskStrings.length; i++) {
-                    String taskStr = taskStrings[i];
-                    if (i > 0) taskStr = "{" + taskStr;
-                    if (i < taskStrings.length - 1) taskStr = taskStr + "}";
-
-                    Task task = parseSingleTask(taskStr);
-                    if (task != null) tasks.add(task);
-                }
-                user.setTasks(tasks);
-                return user;
-            }
-            return new User();
-        } catch (Exception e) {
-            User user = new User();
-            user.setTasks(new ArrayList<>());
-            return user;
-        }
     }
 
     // UI Helper methods
@@ -759,9 +651,10 @@ class UserApplicationFrame extends JFrame {
     private Color getStatusColor(String status) {
         if (status == null) return Color.BLACK;
         switch (status) {
-            case "ВЫПОЛНЕНА": return new Color(46, 204, 113);
-            case "В_ПРОЦЕССЕ": return new Color(241, 196, 15);
+            case "ЗАВЕРШЕНА": return new Color(46, 204, 113);
+            case "В_РАБОТЕ": return new Color(241, 196, 15);
             case "НЕ_НАЧАТА": return new Color(52, 152, 219);
+            case "НА_ДОРАБОТКЕ": return new Color(231, 76, 60);
             default: return Color.BLACK;
         }
     }
@@ -850,27 +743,6 @@ class UserApplicationFrame extends JFrame {
         SwingUtilities.invokeLater(() -> new LoginFrame().setVisible(true));
     }
 
-    private void showDashboard() {
-        // При переходе на главную обновляем статистику
-        if (userTasks == null) {
-            loadUserTasksForStatistics();
-        }
-        cardLayout.show(centerPanel, "welcome");
-    }
-
-    // Добавляем обновление статистики при возврате на главную
-    private void showMyTasks() {
-        tasksPanel.removeAll();
-        JPanel loadedTasksPanel = loadTasksPanel();
-        centerPanel.remove(tasksPanel);
-        tasksPanel = loadedTasksPanel;
-        centerPanel.add(tasksPanel, "tasks");
-        cardLayout.show(centerPanel, "tasks");
-
-        // Обновляем задачи для статистики
-        loadUserTasksForStatistics();
-    }
-
     private Map<String, Object> getUserInfo() {
         try {
             String encodedUsername = java.net.URLEncoder.encode(this.username, "UTF-8");
@@ -909,7 +781,6 @@ class UserApplicationFrame extends JFrame {
         try {
             Map<String, Object> userInfo = new java.util.HashMap<>();
 
-            // Простой парсинг JSON
             if (json.contains("\"username\"")) {
                 String username = extractValueFromJson(json, "username");
                 String role = extractValueFromJson(json, "role");
@@ -940,8 +811,6 @@ class UserApplicationFrame extends JFrame {
             return null;
         }
     }
-
-
 
     private void addInfoRow(JPanel panel, String label, String value) {
         JLabel labelField = new JLabel(label);
@@ -979,18 +848,15 @@ class UserApplicationFrame extends JFrame {
             contentPanel.setBackground(Color.WHITE);
             contentPanel.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
 
-            // Заголовок
             JLabel titleLabel = new JLabel("Информация о профиле", SwingConstants.CENTER);
             titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
             titleLabel.setForeground(new Color(44, 62, 80));
             titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-            // Иконка профиля
             JLabel iconLabel = new JLabel("👤", SwingConstants.CENTER);
             iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 64));
             iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-            // Панель с информацией
             JPanel infoPanel = new JPanel();
             infoPanel.setLayout(new GridLayout(4, 2, 10, 15));
             infoPanel.setBackground(Color.WHITE);
@@ -1004,7 +870,6 @@ class UserApplicationFrame extends JFrame {
             addInfoRow(infoPanel, "Роль:", getRoleDisplayName(role));
             addInfoRow(infoPanel, "Статус:", "Активен");
 
-            // Кнопка закрытия
             JButton closeButton = new JButton("Закрыть");
             closeButton.setFont(new Font("Arial", Font.BOLD, 14));
             closeButton.setForeground(Color.WHITE);
@@ -1044,6 +909,463 @@ class UserApplicationFrame extends JFrame {
                     "Ошибка загрузки информации о профиле: " + e.getMessage(),
                     "Ошибка",
                     JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private int getUserTasksCount() {
+        return userTasks != null ? userTasks.size() : 0;
+    }
+
+    private int getTasksCountByStatus(String status) {
+        if (userTasks == null) return 0;
+
+        return (int) userTasks.stream()
+                .filter(task -> task.getStatus() != null && task.getStatus().equals(status))
+                .count();
+    }
+
+    private JPanel createStatsPanel() {
+        JPanel statsPanel = new JPanel();
+        statsPanel.setLayout(new BoxLayout(statsPanel, BoxLayout.Y_AXIS));
+        statsPanel.setBackground(new Color(248, 249, 250));
+
+        JLabel statsTitle = new JLabel("Статистика всех задач", SwingConstants.CENTER);
+        statsTitle.setFont(new Font("Arial", Font.BOLD, 24));
+        statsTitle.setForeground(new Color(33, 37, 41));
+        statsTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JPanel cardsContainer = new JPanel();
+        cardsContainer.setLayout(new GridLayout(1, 4, 20, 0));
+        cardsContainer.setBackground(new Color(248, 249, 250));
+        cardsContainer.setMaximumSize(new Dimension(1000, 190));
+        cardsContainer.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        int totalTasks = allUsersTasks != null ? allUsersTasks.size() : 0;
+        int notStarted = getTasksCountByStatusFromAll("НЕ_НАЧАТА");
+        int inProgress = getTasksCountByStatusFromAll("В_РАБОТЕ");
+        int completed = getTasksCountByStatusFromAll("ЗАВЕРШЕНА");
+        int rework = getTasksCountByStatusFromAll("НА_ДОРАБОТКЕ");
+
+        System.out.println("DEBUG: Statistics - Total: " + totalTasks +
+                ", Not Started: " + notStarted +
+                ", In Progress: " + inProgress +
+                ", Completed: " + completed +
+                ", Rework: " + rework);
+
+        cardsContainer.add(createStatCard("Всего задач", String.valueOf(totalTasks),
+                new Color(52, 152, 219), "📋"));
+        cardsContainer.add(createStatCard("Не начаты", String.valueOf(notStarted),
+                new Color(241, 196, 15), "⏳"));
+        cardsContainer.add(createStatCard("В работе", String.valueOf(inProgress),
+                new Color(155, 89, 182), "🚀"));
+        cardsContainer.add(createStatCard("Завершено", String.valueOf(completed),
+                new Color(46, 204, 113), "✅"));
+
+        statsPanel.add(statsTitle);
+        statsPanel.add(Box.createVerticalStrut(20));
+        statsPanel.add(cardsContainer);
+
+        return statsPanel;
+    }
+
+    private int getTasksCountByStatusFromAll(String status) {
+        if (allUsersTasks == null) return 0;
+        return (int) allUsersTasks.stream()
+                .filter(task -> task.getStatus() != null && task.getStatus().equals(status))
+                .count();
+    }
+
+    private void showDashboard() {
+        loadUserTasksForStatistics();
+    }
+
+    private User getUserWithTasks() {
+        try {
+            String encodedUsername = java.net.URLEncoder.encode(this.username, "UTF-8");
+            String url = "http://localhost:8080/user?username=" + encodedUsername;
+
+            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(new java.net.URI(url))
+                    .header("Authorization", "Bearer " + authToken)
+                    .header("Content-Type", "application/json")
+                    .GET().build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            System.out.println("DEBUG: getUserWithTasks response: " + response.statusCode());
+            System.out.println("DEBUG: getUserWithTasks body: " + response.body());
+
+            if (response.statusCode() == 200) {
+                return parseUserFromJson(response.body());
+            } else {
+                throw new RuntimeException("HTTP error: " + response.statusCode());
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: Exception in getUserWithTasks: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении задач: " + e.getMessage());
+        }
+    }
+
+    private List<User> getAllUsersWithTasks() {
+        try {
+            String url = "http://localhost:8080/allusers";
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .build();
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(url))
+                    .header("Authorization", "Bearer " + authToken)
+                    .header("Content-Type", "application/json")
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            System.out.println("DEBUG: getAllUsersWithTasks Status code: " + response.statusCode());
+            System.out.println("DEBUG: getAllUsersWithTasks Response body: " + response.body());
+
+            if (response.statusCode() == 200) {
+                List<User> users = parseUsersFromJson(response.body());
+                System.out.println("DEBUG: Parsed " + (users != null ? users.size() : 0) + " users");
+                return users;
+            } else {
+                throw new RuntimeException("HTTP error: " + response.statusCode() + " - " + response.body());
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: Exception in getAllUsersWithTasks: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении всех пользователей: " + e.getMessage());
+        }
+    }
+
+    // Обновите также метод showMyTasks для отладки
+    private void showMyTasks() {
+        tasksPanel.removeAll();
+
+        // Показываем loading
+        tasksPanel.setLayout(new BorderLayout());
+        JLabel loadingLabel = new JLabel("Загрузка ваших задач...", SwingConstants.CENTER);
+        loadingLabel.setFont(new Font("Arial", Font.ITALIC, 16));
+        loadingLabel.setForeground(Color.GRAY);
+        tasksPanel.add(loadingLabel, BorderLayout.CENTER);
+
+        centerPanel.remove(tasksPanel);
+        centerPanel.add(tasksPanel, "tasks");
+        cardLayout.show(centerPanel, "tasks");
+        centerPanel.revalidate();
+        centerPanel.repaint();
+
+        new Thread(() -> {
+            try {
+                System.out.println("DEBUG: Starting to load user tasks...");
+                User user = getUserWithTasks();
+                SwingUtilities.invokeLater(() -> {
+                    tasksPanel.removeAll();
+                    tasksPanel.setLayout(new BorderLayout());
+
+                    JLabel titleLabel = new JLabel("Мои задачи", SwingConstants.CENTER);
+                    titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+                    titleLabel.setForeground(new Color(44, 62, 80));
+                    titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
+                    tasksPanel.add(titleLabel, BorderLayout.NORTH);
+
+                    if (user != null && user.getTasks() != null && !user.getTasks().isEmpty()) {
+                        userTasks = user.getTasks();
+                        System.out.println("DEBUG: Displaying " + userTasks.size() + " tasks");
+                        displayTasks(tasksPanel, user.getTasks(), false);
+                    } else {
+                        System.out.println("DEBUG: No tasks found for user");
+                        showNoTasksMessage(tasksPanel);
+                        userTasks = new ArrayList<>();
+                    }
+
+                    tasksPanel.revalidate();
+                    tasksPanel.repaint();
+                });
+            } catch (Exception e) {
+                System.out.println("DEBUG: Error in showMyTasks: " + e.getMessage());
+                e.printStackTrace();
+                SwingUtilities.invokeLater(() -> {
+                    showErrorPanel(tasksPanel, "Ошибка загрузки задач: " + e.getMessage());
+                    tasksPanel.revalidate();
+                    tasksPanel.repaint();
+                });
+            }
+        }).start();
+    }
+
+    private void loadUserTasksForStatistics() {
+        new Thread(() -> {
+            try {
+                System.out.println("DEBUG: Loading tasks for statistics...");
+                List<User> allUsers = getAllUsersWithTasks();
+                if (allUsers != null) {
+                    List<Task> allTasks = new ArrayList<>();
+                    for (User user : allUsers) {
+                        if (user.getTasks() != null) {
+                            allTasks.addAll(user.getTasks());
+                        }
+                    }
+                    allUsersTasks = allTasks;
+                    System.out.println("DEBUG: Loaded " + allTasks.size() + " tasks for statistics");
+
+                    SwingUtilities.invokeLater(() -> {
+                        centerPanel.removeAll();
+                        JPanel welcomePanel = createWelcomePanel();
+                        centerPanel.add(welcomePanel, "welcome");
+
+                        if (cardLayout != null) {
+                            cardLayout.show(centerPanel, "welcome");
+                        }
+
+                        centerPanel.revalidate();
+                        centerPanel.repaint();
+                    });
+                }
+            } catch (Exception e) {
+                System.out.println("DEBUG: Error loading tasks for statistics: " + e.getMessage());
+                e.printStackTrace();
+                // Даже при ошибке показываем welcome panel
+                SwingUtilities.invokeLater(() -> {
+                    centerPanel.removeAll();
+                    JPanel welcomePanel = createWelcomePanel();
+                    centerPanel.add(welcomePanel, "welcome");
+                    cardLayout.show(centerPanel, "welcome");
+                    centerPanel.revalidate();
+                    centerPanel.repaint();
+                });
+            }
+        }).start();
+    }
+
+
+    private List<User> parseUsersFromJson(String json) {
+        try {
+            List<User> users = new ArrayList<>();
+            if (json == null || json.trim().isEmpty()) {
+                System.out.println("DEBUG: Empty JSON response");
+                return users;
+            }
+
+            System.out.println("DEBUG: Raw users JSON: " + json);
+
+            // Убираем внешние квадратные скобки если они есть
+            String content = json.trim();
+            if (content.startsWith("[") && content.endsWith("]")) {
+                content = content.substring(1, content.length() - 1).trim();
+            }
+
+            // Разделяем пользователей по },{
+            String[] userStrings = content.split("\\},\\s*\\{");
+            System.out.println("DEBUG: Found " + userStrings.length + " user strings");
+
+            for (int i = 0; i < userStrings.length; i++) {
+                String userStr = userStrings[i];
+                if (i > 0) userStr = "{" + userStr;
+                if (i < userStrings.length - 1) userStr = userStr + "}";
+
+                User user = parseSingleUserFromAllUsers(userStr);
+                if (user != null && user.getUsername() != null) {
+                    users.add(user);
+                    System.out.println("DEBUG: Added user: " + user.getUsername() + " with " +
+                            (user.getTasks() != null ? user.getTasks().size() : 0) + " tasks");
+                }
+            }
+
+            return users;
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error parsing users: " + e.getMessage());
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
+    private User parseSingleUserFromAllUsers(String userJson) {
+        try {
+            System.out.println("DEBUG: Parsing single user: " + userJson);
+
+            User user = new User();
+            String username = extractValue(userJson, "username");
+            if (username == null) return null;
+
+            user.setUsername(username);
+
+            // Парсим задачи пользователя
+            if (userJson.contains("\"tasks\":")) {
+                int tasksStart = userJson.indexOf("\"tasks\":[") + 9;
+                int tasksEnd = userJson.indexOf("]", tasksStart);
+                if (tasksEnd > tasksStart) {
+                    String tasksArray = userJson.substring(tasksStart, tasksEnd);
+                    System.out.println("DEBUG: Tasks array for user " + username + ": " + tasksArray);
+                    List<Task> tasks = parseTasksArray(tasksArray);
+                    user.setTasks(tasks);
+                }
+            }
+            return user;
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error parsing single user: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private List<Task> parseTasksArray(String tasksJson) {
+        List<Task> tasks = new ArrayList<>();
+        try {
+            if (tasksJson == null || tasksJson.trim().isEmpty()) {
+                System.out.println("DEBUG: Empty tasks array");
+                return tasks;
+            }
+
+            System.out.println("DEBUG: Parsing tasks array: " + tasksJson);
+
+            // Разделяем задачи по },{
+            String[] taskStrings = tasksJson.split("\\},\\s*\\{");
+            System.out.println("DEBUG: Found " + taskStrings.length + " task strings");
+
+            for (int i = 0; i < taskStrings.length; i++) {
+                String taskStr = taskStrings[i];
+                if (i > 0) taskStr = "{" + taskStr;
+                if (i < taskStrings.length - 1) taskStr = taskStr + "}";
+
+                Task task = parseSingleTask(taskStr);
+                if (task != null && task.getTitle() != null) {
+                    tasks.add(task);
+                    System.out.println("DEBUG: Added task: " + task.getTitle());
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error parsing tasks array: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return tasks;
+    }
+
+    private Task parseSingleTask(String taskJson) {
+        try {
+            System.out.println("DEBUG: Parsing task: " + taskJson);
+
+            String title = extractValue(taskJson, "title");
+            String description = extractValue(taskJson, "description");
+            String status = extractValue(taskJson, "status");
+            String importance = extractValue(taskJson, "importance");
+            String deadline = extractValue(taskJson, "deadline");
+
+            if (title != null) {
+                Task task = new Task();
+                task.setTitle(title);
+                task.setDescription(description);
+                task.setStatus(status);
+                task.setImportance(importance);
+                task.setDeadline(deadline);
+
+                // Парсинг комментариев
+                if (taskJson.contains("\"comments\":")) {
+                    int commentsStart = taskJson.indexOf("\"comments\":[") + 11;
+                    int commentsEnd = taskJson.indexOf("]", commentsStart);
+                    if (commentsEnd > commentsStart) {
+                        String commentsArray = taskJson.substring(commentsStart, commentsEnd);
+                        List<Comment> comments = parseCommentsArray(commentsArray);
+                        task.setComments(comments);
+                        System.out.println("DEBUG: Found " + comments.size() + " comments for task: " + title);
+                    }
+                }
+                return task;
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error parsing task: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    // Обновите также метод extractValue для лучшего парсинга
+    private String extractValue(String json, String key) {
+        try {
+            // Пробуем найти строковое значение в кавычках
+            String searchStr = "\"" + key + "\":\"";
+            int start = json.indexOf(searchStr);
+            if (start != -1) {
+                start += searchStr.length();
+                int end = json.indexOf("\"", start);
+                if (end != -1) {
+                    return json.substring(start, end);
+                }
+            }
+
+            // Пробуем найти числовое значение (без кавычек)
+            searchStr = "\"" + key + "\":";
+            start = json.indexOf(searchStr);
+            if (start != -1) {
+                start += searchStr.length();
+                int end = json.indexOf(",", start);
+                if (end == -1) end = json.indexOf("}", start);
+                if (end == -1) end = json.indexOf("]", start);
+                if (end != -1) {
+                    String value = json.substring(start, end).trim();
+                    // Убираем кавычки если они есть
+                    if (value.startsWith("\"") && value.endsWith("\"")) {
+                        value = value.substring(1, value.length() - 1);
+                    }
+                    return value;
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error extracting value for key " + key + ": " + e.getMessage());
+        }
+        return null;
+    }
+
+    private User parseUserFromJson(String json) {
+        try {
+            System.out.println("DEBUG: Parsing user JSON: " + json);
+
+            User user = new User();
+            List<Task> tasks = new ArrayList<>();
+
+            // Извлекаем username
+            String username = extractValue(json, "username");
+            if (username != null) {
+                user.setUsername(username);
+            }
+
+            // Парсим задачи
+            if (json.contains("\"tasks\"")) {
+                int tasksStart = json.indexOf("\"tasks\":[") + 9;
+                int tasksEnd = json.indexOf("]", tasksStart);
+                if (tasksEnd > tasksStart) {
+                    String tasksArray = json.substring(tasksStart, tasksEnd);
+                    System.out.println("DEBUG: Tasks array for current user: " + tasksArray);
+
+                    // Разделяем задачи по },{
+                    String[] taskStrings = tasksArray.split("\\},\\s*\\{");
+                    System.out.println("DEBUG: Found " + taskStrings.length + " task strings for current user");
+
+                    for (int i = 0; i < taskStrings.length; i++) {
+                        String taskStr = taskStrings[i];
+                        if (i > 0) taskStr = "{" + taskStr;
+                        if (i < taskStrings.length - 1) taskStr = taskStr + "}";
+
+                        Task task = parseSingleTask(taskStr);
+                        if (task != null && task.getTitle() != null) {
+                            tasks.add(task);
+                        }
+                    }
+                }
+            }
+
+            user.setTasks(tasks);
+            System.out.println("DEBUG: Parsed current user: " + username + " with " + tasks.size() + " tasks");
+            return user;
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error parsing current user: " + e.getMessage());
+            e.printStackTrace();
+            User user = new User();
+            user.setTasks(new ArrayList<>());
+            return user;
         }
     }
 }

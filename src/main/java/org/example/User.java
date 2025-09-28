@@ -4,10 +4,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 
+import java.util.List;
+import java.util.ArrayList;
+
 public class User {
     private String username;
     private String role;
     private List<Task> tasks;
+
+    public User() {
+        this.tasks = new ArrayList<>();
+    }
 
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
