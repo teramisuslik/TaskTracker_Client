@@ -12,6 +12,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.prefs.Preferences;
 
 
@@ -332,13 +334,289 @@ public class LoginFrame extends JFrame {
         statusLabel.setForeground(color);
     }
 
-    // Метод для открытия главного окна приложения
+    // В LoginFrame добавляем методы для плавных переходов
     private void openMainApplicationFrame(String token) {
-        this.dispose(); // Закрываем окно входа
-        MainApplicationFrame mainFrame = new MainApplicationFrame(token);
-        mainFrame.setVisible(true);
+        // Сначала создаем новое окно
+        Map<String, Object> userInfo = getUserInfo(token);
+        String role = (userInfo != null && userInfo.containsKey("role")) ?
+                userInfo.get("role").toString() : "USER";
+
+        JFrame newFrame;
+        if ("ADMIN".equals(role.toUpperCase())) {
+            newFrame = new AdminApplicationFrame(token, userInfo);
+        } else {
+            newFrame = new UserApplicationFrame(token, userInfo);
+        }
+
+        // Устанавливаем новое окно невидимым для анимации
+        newFrame.setVisible(false);
+
+        // Анимация исчезновения текущего окна
+        Timer fadeOutTimer = new Timer(20, new ActionListener() {
+            float opacity = 1f;
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                opacity -= 0.05f; // Медленнее для плавности
+                if (opacity <= 0f) {
+                    opacity = 0f;
+                    ((Timer) e.getSource()).stop();
+
+                    // После завершения анимации скрытия
+                    setVisible(false);
+                    dispose();
+
+                    // Показываем новое окно с анимацией
+                    openNewFrameWithAnimation(newFrame);
+                }
+                // Устанавливаем прозрачность только если окно не декорировано
+                try {
+                    setOpacity(opacity);
+                } catch (IllegalComponentStateException ex) {
+                    // Если нельзя установить прозрачность, просто продолжаем
+                    ((Timer) e.getSource()).stop();
+                    setVisible(false);
+                    dispose();
+                    openNewFrameWithAnimation(newFrame);
+                }
+            }
+        });
+        fadeOutTimer.start();
     }
 
+    private Map<String, Object> getUserInfo(String token) {
+        try {
+            // Сначала пробуем получить username из токена
+            String username = getUsernameFromTokenDirect(token);
+            if (username == null) {
+                System.out.println("Не удалось извлечь username из токена");
+                return null;
+            }
+
+            System.out.println("Username из токена: " + username);
+
+            HttpClient client = HttpClient.newHttpClient();
+            String url = "http://localhost:8080/userwithouttasks?username=" +
+                    java.net.URLEncoder.encode(username, "UTF-8");
+
+            System.out.println("Запрос к URL: " + url);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Authorization", "Bearer " + token)
+                    .header("Accept", "application/json")
+                    .GET()
+                    .timeout(Duration.ofSeconds(10))
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            System.out.println("Статус ответа: " + response.statusCode());
+            System.out.println("Тело ответа: " + response.body());
+
+            if (response.statusCode() == 200) {
+                // Парсим JSON ответ
+                return parseUserInfo(response.body());
+            } else {
+                System.out.println("Ошибка HTTP: " + response.statusCode());
+            }
+        } catch (Exception e) {
+            System.err.println("Ошибка получения информации о пользователе: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    // Прямое извлечение username из токена
+    private String getUsernameFromTokenDirect(String token) {
+        try {
+            String[] parts = token.split("\\.");
+            if (parts.length >= 2) {
+                String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
+                System.out.println("Payload токена: " + payload);
+
+                // Ищем sub (subject) поле
+                int subStart = payload.indexOf("\"sub\":\"");
+                if (subStart != -1) {
+                    subStart += 7;
+                    int subEnd = payload.indexOf("\"", subStart);
+                    if (subEnd > subStart) {
+                        return payload.substring(subStart, subEnd);
+                    }
+                }
+
+                // Ищем username поле
+                int usernameStart = payload.indexOf("\"username\":\"");
+                if (usernameStart != -1) {
+                    usernameStart += 12;
+                    int usernameEnd = payload.indexOf("\"", usernameStart);
+                    if (usernameEnd > usernameStart) {
+                        return payload.substring(usernameStart, usernameEnd);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Ошибка извлечения username из токена: " + e.getMessage());
+        }
+        return null;
+    }
+
+    // В классе LoginFrame исправляем метод parseUserInfo
+    private Map<String, Object> parseUserInfo(String jsonResponse) {
+        try {
+            Map<String, Object> userInfo = new HashMap<>();
+
+            // Извлекаем username
+            if (jsonResponse.contains("\"username\"")) {
+                int usernameStart = jsonResponse.indexOf("\"username\":\"") + 11;
+                int usernameEnd = jsonResponse.indexOf("\"", usernameStart);
+                if (usernameStart > 10 && usernameEnd > usernameStart) {
+                    userInfo.put("username", jsonResponse.substring(usernameStart, usernameEnd));
+                }
+            }
+
+            // Извлекаем role - исправленный вариант
+            String role = extractRoleFromJson(jsonResponse);
+            userInfo.put("role", role);
+
+            return userInfo;
+        } catch (Exception e) {
+            System.err.println("Ошибка парсинга информации о пользователе: " + e.getMessage());
+        }
+        return null;
+    }
+
+    // Новый метод для извлечения роли с учетом разных форматов
+    private String extractRoleFromJson(String jsonResponse) {
+        try {
+            // Пробуем разные варианты названий полей
+            String[] rolePatterns = {
+                    "\"role\":\"([^\"]+)\"",      // "role":"ADMIN"
+                    "\"role\": \"([^\"]+)\"",     // "role": "ADMIN"
+                    "\"authority\":\"([^\"]+)\"", // "authority":"ROLE_ADMIN"
+                    "\"authority\": \"([^\"]+)\"" // "authority": "ROLE_ADMIN"
+            };
+
+            for (String pattern : rolePatterns) {
+                java.util.regex.Pattern p = java.util.regex.Pattern.compile(pattern);
+                java.util.regex.Matcher m = p.matcher(jsonResponse);
+                if (m.find()) {
+                    String foundRole = m.group(1);
+                    return normalizeRole(foundRole);
+                }
+            }
+
+            // Если не нашли по шаблонам, пробуем простой поиск
+            if (jsonResponse.contains("\"role\"")) {
+                int roleStart = jsonResponse.indexOf("\"role\":\"") + 8;
+                if (roleStart < 8) {
+                    roleStart = jsonResponse.indexOf("\"role\": \"") + 9;
+                }
+                if (roleStart > 7) {
+                    int roleEnd = jsonResponse.indexOf("\"", roleStart);
+                    if (roleEnd > roleStart) {
+                        String foundRole = jsonResponse.substring(roleStart, roleEnd);
+                        return normalizeRole(foundRole);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Ошибка извлечения роли: " + e.getMessage());
+        }
+        return "USER"; // Значение по умолчанию
+    }
+
+    // Нормализация роли (приведение к формату ADMIN/USER)
+    private String normalizeRole(String role) {
+        if (role == null) return "USER";
+
+        role = role.toUpperCase().trim();
+
+        // Если роль в формате ROLE_ADMIN или ROLE_USER
+        if (role.startsWith("ROLE_")) {
+            role = role.substring(5); // Убираем ROLE_
+        }
+
+        // Проверяем, что роль соответствует нашим ожиданиям
+        if ("ADMIN".equals(role) || "USER".equals(role)) {
+            return role;
+        }
+
+        return "USER"; // Значение по умолчанию
+    }
+
+    // Также улучшим метод getUsernameFromToken для надежности
+    private String getUsernameFromToken(String token) {
+        try {
+            // Сначала пробуем получить username из эндпоинта /userwithouttasks
+            // Если не получится, тогда парсим из токена
+            Map<String, Object> userInfo = getUserInfo(token);
+            if (userInfo != null && userInfo.containsKey("username")) {
+                return userInfo.get("username").toString();
+            }
+
+            // Если не получилось из API, парсим из токена
+            String[] parts = token.split("\\.");
+            if (parts.length >= 2) {
+                String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
+
+                // Ищем username в разных полях
+                String[] usernameFields = {"\"sub\":\"", "\"username\":\"", "\"preferred_username\":\""};
+
+                for (String field : usernameFields) {
+                    int usernameStart = payload.indexOf(field);
+                    if (usernameStart != -1) {
+                        usernameStart += field.length();
+                        int usernameEnd = payload.indexOf("\"", usernameStart);
+                        if (usernameEnd > usernameStart) {
+                            return payload.substring(usernameStart, usernameEnd);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Ошибка извлечения username: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private void openNewFrameWithAnimation(JFrame newFrame) {
+        // Убедимся, что окно невидимо перед анимацией
+        newFrame.setVisible(false);
+
+        // Для окон без декораций можно использовать прозрачность
+        // Для окон с декорациями используем альтернативный подход
+
+        try {
+            // Пробуем установить прозрачность (работает для undecorated окон)
+            newFrame.setOpacity(0f);
+            newFrame.setVisible(true);
+
+            // Анимация появления
+            Timer fadeInTimer = new Timer(20, new ActionListener() {
+                float opacity = 0f;
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    opacity += 0.05f; // Медленнее для плавности
+                    if (opacity >= 1f) {
+                        opacity = 1f;
+                        ((Timer) e.getSource()).stop();
+                    }
+                    try {
+                        newFrame.setOpacity(opacity);
+                    } catch (IllegalComponentStateException ex) {
+                        // Если нельзя установить прозрачность, просто показываем окно
+                        ((Timer) e.getSource()).stop();
+                        newFrame.setVisible(true);
+                    }
+                }
+            });
+            fadeInTimer.start();
+
+        } catch (IllegalComponentStateException e) {
+            // Если установка прозрачности не поддерживается, просто показываем окно
+            newFrame.setVisible(true);
+        }
+    }
 }
 
 
