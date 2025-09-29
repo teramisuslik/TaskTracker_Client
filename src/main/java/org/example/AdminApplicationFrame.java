@@ -1,13 +1,18 @@
 package org.example;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Map;
+import java.util.*;
 import java.util.List;
 
 
@@ -91,10 +96,6 @@ public class AdminApplicationFrame extends JFrame {
         button.setBorder(BorderFactory.createEmptyBorder(8, 15, 8, 15));
         button.setFocusPainted(false);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-    }
-
-    private void showUserManagement() {
-        showInfoDialog("Функция управления пользователями", "Эта функция будет реализована в следующем обновлении.");
     }
 
     private void showInfoDialog(String title, String message) {
@@ -742,44 +743,6 @@ public class AdminApplicationFrame extends JFrame {
         }
     }
 
-    private Task parseSingleTask(String taskJson) {
-        try {
-            System.out.println("DEBUG: Admin - Parsing task: " + taskJson);
-
-            String title = extractValue(taskJson, "title");
-            String description = extractValue(taskJson, "description");
-            String status = extractValue(taskJson, "status");
-            String importance = extractValue(taskJson, "importance");
-            String deadline = extractValue(taskJson, "deadline");
-
-            if (title != null) {
-                Task task = new Task();
-                task.setTitle(title);
-                task.setDescription(description);
-                task.setStatus(status);
-                task.setImportance(importance);
-                task.setDeadline(deadline);
-
-                // Парсинг комментариев
-                if (taskJson.contains("\"comments\":")) {
-                    int commentsStart = taskJson.indexOf("\"comments\":[") + 11;
-                    int commentsEnd = taskJson.indexOf("]", commentsStart);
-                    if (commentsEnd > commentsStart) {
-                        String commentsArray = taskJson.substring(commentsStart, commentsEnd);
-                        List<Comment> comments = parseCommentsArray(commentsArray);
-                        task.setComments(comments);
-                        System.out.println("DEBUG: Admin - Found " + comments.size() + " comments for task: " + title);
-                    }
-                }
-                return task;
-            }
-        } catch (Exception e) {
-            System.out.println("DEBUG: Admin - Error parsing task: " + e.getMessage());
-            e.printStackTrace();
-        }
-        return null;
-    }
-
     private List<Comment> parseCommentsArray(String commentsJson) {
         List<Comment> comments = new ArrayList<>();
         try {
@@ -1266,95 +1229,6 @@ public class AdminApplicationFrame extends JFrame {
         }
     }
 
-    private String escapeJsonString(String text) {
-        if (text == null) return "";
-        return text.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
-    }
-
-    private void showSuccessMessage(String message) {
-        JDialog successDialog = new JDialog(this, "Успех", true);
-        successDialog.setSize(400, 200);
-        successDialog.setLocationRelativeTo(this);
-        successDialog.setLayout(new BorderLayout());
-        successDialog.setResizable(false);
-
-        JPanel contentPanel = new JPanel();
-        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-        contentPanel.setBackground(Color.WHITE);
-        contentPanel.setBorder(BorderFactory.createEmptyBorder(25, 30, 25, 30));
-
-        JLabel iconLabel = new JLabel("✅", SwingConstants.CENTER);
-        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
-        iconLabel.setForeground(new Color(46, 204, 113));
-        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JLabel messageLabel = new JLabel(message, SwingConstants.CENTER);
-        messageLabel.setFont(new Font("Arial", Font.PLAIN, 14));
-        messageLabel.setForeground(new Color(44, 62, 80));
-        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JButton okButton = new JButton("OK");
-        styleReworkDialogButton(okButton, new Color(46, 204, 113));
-        okButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        okButton.addActionListener(e -> successDialog.dispose());
-
-        contentPanel.add(iconLabel);
-        contentPanel.add(Box.createVerticalStrut(15));
-        contentPanel.add(messageLabel);
-        contentPanel.add(Box.createVerticalStrut(20));
-        contentPanel.add(okButton);
-
-        successDialog.add(contentPanel, BorderLayout.CENTER);
-        successDialog.getRootPane().setDefaultButton(okButton);
-        successDialog.pack();
-        successDialog.setLocationRelativeTo(this);
-        successDialog.setVisible(true);
-    }
-
-    private void showErrorMessage(String message) {
-        JDialog errorDialog = new JDialog(this, "Ошибка", true);
-        errorDialog.setSize(400, 200);
-        errorDialog.setLocationRelativeTo(this);
-        errorDialog.setLayout(new BorderLayout());
-        errorDialog.setResizable(false);
-
-        JPanel contentPanel = new JPanel();
-        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-        contentPanel.setBackground(Color.WHITE);
-        contentPanel.setBorder(BorderFactory.createEmptyBorder(25, 30, 25, 30));
-
-        JLabel iconLabel = new JLabel("❌", SwingConstants.CENTER);
-        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
-        iconLabel.setForeground(new Color(231, 76, 60));
-        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JLabel messageLabel = new JLabel(message, SwingConstants.CENTER);
-        messageLabel.setFont(new Font("Arial", Font.PLAIN, 14));
-        messageLabel.setForeground(new Color(44, 62, 80));
-        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JButton okButton = new JButton("OK");
-        styleReworkDialogButton(okButton, new Color(231, 76, 60));
-        okButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        okButton.addActionListener(e -> errorDialog.dispose());
-
-        contentPanel.add(iconLabel);
-        contentPanel.add(Box.createVerticalStrut(15));
-        contentPanel.add(messageLabel);
-        contentPanel.add(Box.createVerticalStrut(20));
-        contentPanel.add(okButton);
-
-        errorDialog.add(contentPanel, BorderLayout.CENTER);
-        errorDialog.getRootPane().setDefaultButton(okButton);
-        errorDialog.pack();
-        errorDialog.setLocationRelativeTo(this);
-        errorDialog.setVisible(true);
-    }
-
     private void updateStatsInPanel(JPanel panel, int totalTasks, int notStarted, int completed, int totalUsers) {
         Component[] components = panel.getComponents();
         for (Component comp : components) {
@@ -1768,45 +1642,6 @@ public class AdminApplicationFrame extends JFrame {
         return tasks;
     }
 
-    private Task parseSingleTaskImproved(String taskJson) {
-        try {
-            System.out.println("DEBUG: Admin - Parsing task: " + taskJson);
-
-            // Используем улучшенный метод extractValue
-            String title = extractValueImproved(taskJson, "title");
-            String description = extractValueImproved(taskJson, "description");
-            String status = extractValueImproved(taskJson, "status");
-            String importance = extractValueImproved(taskJson, "importance");
-            String deadline = extractValueImproved(taskJson, "deadline");
-
-            if (title != null) {
-                Task task = new Task();
-                task.setTitle(title);
-                task.setDescription(description);
-                task.setStatus(status);
-                task.setImportance(importance);
-                task.setDeadline(deadline);
-
-                // Парсинг комментариев
-                if (taskJson.contains("\"comments\":")) {
-                    int commentsStart = taskJson.indexOf("\"comments\":[") + 11;
-                    int commentsEnd = findMatchingBracket(taskJson, commentsStart - 1);
-                    if (commentsEnd > commentsStart) {
-                        String commentsArray = taskJson.substring(commentsStart, commentsEnd).trim();
-                        List<Comment> comments = parseCommentsArrayImproved(commentsArray);
-                        task.setComments(comments);
-                        System.out.println("DEBUG: Admin - Found " + comments.size() + " comments for task: " + title);
-                    }
-                }
-                return task;
-            }
-        } catch (Exception e) {
-            System.out.println("DEBUG: Admin - Error parsing task: " + e.getMessage());
-            e.printStackTrace();
-        }
-        return null;
-    }
-
     private void updateAdminStatsPanel(List<User> users) {
         if (users == null) {
             System.out.println("DEBUG: Users list is null");
@@ -2182,27 +2017,6 @@ public class AdminApplicationFrame extends JFrame {
         return commentPanel;
     }
 
-    private void styleDialogButton(JButton button, Color color) {
-        button.setFont(new Font("Arial", Font.BOLD, 14));
-        button.setForeground(Color.WHITE);
-        button.setBackground(color);
-        button.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(color.darker(), 1),
-                BorderFactory.createEmptyBorder(10, 25, 10, 25)
-        ));
-        button.setFocusPainted(false);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
-        button.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseEntered(java.awt.event.MouseEvent evt) {
-                button.setBackground(color.darker());
-            }
-            public void mouseExited(java.awt.event.MouseEvent evt) {
-                button.setBackground(color);
-            }
-        });
-    }
-
     private void showTaskCommentsCompact(Task task) {
         JDialog commentsDialog = new JDialog(this, "Комментарии к задаче", true);
         commentsDialog.setSize(500, 400);
@@ -2305,5 +2119,2439 @@ public class AdminApplicationFrame extends JFrame {
         return panel;
     }
 
+    // Загрузка пользователей
+    private void loadUsers(DefaultListModel<String> usersListModel, DefaultListModel<String> tasksListModel, JList<String> tasksList) {
+        showLoadingDialog("Загрузка пользователей...");
 
+        new Thread(() -> {
+            try {
+                List<User> users = getAllUsersWithTasks();
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    usersListModel.clear();
+                    tasksListModel.clear();
+
+                    if (users != null && !users.isEmpty()) {
+                        for (User user : users) {
+                            usersListModel.addElement(user.getUsername());
+                        }
+                        showSuccessMessage("Загружено " + users.size() + " пользователей");
+                    } else {
+                        usersListModel.addElement("Пользователи не найдены");
+                        showInfoMessage("Пользователи не найдены");
+                    }
+                });
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    usersListModel.clear();
+                    usersListModel.addElement("Ошибка загрузки: " + e.getMessage());
+                    showErrorMessage("Ошибка загрузки пользователей: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    // Загрузка задач пользователя
+    private void loadUserTasks(String username, DefaultListModel<String> tasksListModel) {
+        showLoadingDialog("Загрузка задач пользователя...");
+
+        new Thread(() -> {
+            try {
+                List<User> users = getAllUsersWithTasks();
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    tasksListModel.clear();
+
+                    if (users != null) {
+                        for (User user : users) {
+                            if (user.getUsername().equals(username) && user.getTasks() != null) {
+                                for (Task task : user.getTasks()) {
+                                    String taskInfo = String.format("%s | %s | %s",
+                                            task.getTitle(),
+                                            getStatusDisplayName(task.getStatus()),
+                                            task.getDeadline() != null ? task.getDeadline().split("T")[0] : "нет дедлайна"
+                                    );
+                                    tasksListModel.addElement(taskInfo);
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    if (tasksListModel.isEmpty()) {
+                        tasksListModel.addElement("Задачи не найдены");
+                    }
+                });
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    tasksListModel.clear();
+                    tasksListModel.addElement("Ошибка загрузки: " + e.getMessage());
+                    showErrorMessage("Ошибка загрузки задач: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    // Удаление пользователя
+    private void deleteSelectedUser() {
+        JList<String> usersList = findUsersList();
+        if (usersList == null) return;
+
+        String selectedUser = usersList.getSelectedValue();
+        if (selectedUser == null || selectedUser.equals("Пользователи не найдены") || selectedUser.startsWith("Ошибка")) {
+            showErrorMessage("Выберите пользователя для удаления");
+            return;
+        }
+
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Вы уверены, что хотите удалить пользователя '" + selectedUser + "'?\nЭто действие нельзя отменить.",
+                "Подтверждение удаления",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            performDeleteUser(selectedUser);
+        }
+    }
+
+    private void performDeleteUser(String username) {
+        showLoadingDialog("Удаление пользователя " + username + "...");
+
+        new Thread(() -> {
+            try {
+                String url = "http://localhost:8080/deleteuser/" +
+                        java.net.URLEncoder.encode(username, "UTF-8");
+
+                HttpClient client = HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(10))
+                        .build();
+
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(url))
+                        .header("Authorization", "Bearer " + authToken)
+                        .DELETE()
+                        .build();
+
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+
+                    if (response.statusCode() == 200) {
+                        showSuccessMessage("Пользователь '" + username + "' успешно удален");
+                        refreshUserManagement();
+                    } else {
+                        showErrorMessage("Ошибка при удалении пользователя: " + response.body());
+                    }
+                });
+
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    showErrorMessage("Ошибка при удалении пользователя: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    // Удаление задачи
+    private void deleteSelectedTask() {
+        JList<String> usersList = findUsersList();
+        JList<String> tasksList = findTasksList();
+
+        if (usersList == null || tasksList == null) return;
+
+        String selectedUser = usersList.getSelectedValue();
+        String selectedTask = tasksList.getSelectedValue();
+
+        if (selectedUser == null || selectedUser.equals("Пользователи не найдены") || selectedUser.startsWith("Ошибка")) {
+            showErrorMessage("Выберите пользователя");
+            return;
+        }
+
+        if (selectedTask == null || selectedTask.equals("Задачи не найдены") || selectedTask.startsWith("Ошибка")) {
+            showErrorMessage("Выберите задачу для удаления");
+            return;
+        }
+
+        // Извлекаем название задачи из строки
+        String taskTitle = selectedTask.split(" \\| ")[0];
+
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Вы уверены, что хотите удалить задачу '" + taskTitle + "' у пользователя '" + selectedUser + "'?",
+                "Подтверждение удаления",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            performDeleteTask(selectedUser, taskTitle);
+        }
+    }
+
+    private void performDeleteTask(String username, String taskTitle) {
+        showLoadingDialog("Удаление задачи '" + taskTitle + "'...");
+
+        new Thread(() -> {
+            try {
+                String url = "http://localhost:8080/deletetask/" +
+                        java.net.URLEncoder.encode(username, "UTF-8") + "/" +
+                        java.net.URLEncoder.encode(taskTitle, "UTF-8");
+
+                HttpClient client = HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(10))
+                        .build();
+
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(url))
+                        .header("Authorization", "Bearer " + authToken)
+                        .DELETE()
+                        .build();
+
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+
+                    if (response.statusCode() == 200) {
+                        showSuccessMessage("Задача '" + taskTitle + "' успешно удалена");
+                        refreshUserManagement();
+                    } else {
+                        showErrorMessage("Ошибка при удалении задачи: " + response.body());
+                    }
+                });
+
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    showErrorMessage("Ошибка при удалении задачи: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    // Переназначение задачи
+    private void reassignSelectedTask() {
+        JList<String> usersList = findUsersList();
+        JList<String> tasksList = findTasksList();
+
+        if (usersList == null || tasksList == null) return;
+
+        String selectedUser = usersList.getSelectedValue();
+        String selectedTask = tasksList.getSelectedValue();
+
+        if (selectedUser == null || selectedTask == null ||
+                selectedUser.equals("Пользователи не найдены") || selectedTask.equals("Задачи не найдены")) {
+            showErrorMessage("Выберите пользователя и задачу");
+            return;
+        }
+
+        // Извлекаем название задачи
+        String taskTitle = selectedTask.split(" \\| ")[0];
+
+        // Диалог выбора нового пользователя
+        showReassignDialog(selectedUser, taskTitle);
+    }
+
+    private void showReassignDialog(String currentUser, String taskTitle) {
+        JDialog reassignDialog = new JDialog(this, "Переназначение задачи", true);
+        reassignDialog.setSize(400, 300);
+        reassignDialog.setLocationRelativeTo(this);
+        reassignDialog.setLayout(new BorderLayout());
+
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(Color.WHITE);
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JLabel titleLabel = new JLabel("Переназначение задачи", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel taskInfoLabel = new JLabel("Задача: " + taskTitle, SwingConstants.CENTER);
+        taskInfoLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        taskInfoLabel.setForeground(Color.GRAY);
+        taskInfoLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel currentUserLabel = new JLabel("Текущий пользователь: " + currentUser, SwingConstants.CENTER);
+        currentUserLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        currentUserLabel.setForeground(Color.GRAY);
+        currentUserLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel newUserLabel = new JLabel("Новый пользователь:");
+        newUserLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        newUserLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JComboBox<String> usersComboBox = new JComboBox<>();
+        usersComboBox.setPreferredSize(new Dimension(300, 30));
+        usersComboBox.setMaximumSize(new Dimension(300, 30));
+
+        JButton reassignButton = new JButton("Переназначить");
+        JButton cancelButton = new JButton("Отмена");
+
+        styleManagementButton(reassignButton, new Color(52, 152, 219));
+        styleManagementButton(cancelButton, new Color(108, 117, 125));
+
+        reassignButton.addActionListener(e -> {
+            String newUser = (String) usersComboBox.getSelectedItem();
+            if (newUser != null && !newUser.equals(currentUser)) {
+                reassignDialog.dispose();
+                performReassignTask(currentUser, taskTitle, newUser);
+            } else {
+                showErrorMessage("Выберите другого пользователя");
+            }
+        });
+
+        cancelButton.addActionListener(e -> reassignDialog.dispose());
+
+        // Загрузка пользователей для выбора
+        loadUsersForReassign(usersComboBox, currentUser);
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        buttonPanel.setBackground(Color.WHITE);
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(reassignButton);
+
+        contentPanel.add(titleLabel);
+        contentPanel.add(Box.createVerticalStrut(10));
+        contentPanel.add(taskInfoLabel);
+        contentPanel.add(Box.createVerticalStrut(5));
+        contentPanel.add(currentUserLabel);
+        contentPanel.add(Box.createVerticalStrut(20));
+        contentPanel.add(newUserLabel);
+        contentPanel.add(Box.createVerticalStrut(5));
+        contentPanel.add(usersComboBox);
+        contentPanel.add(Box.createVerticalStrut(20));
+        contentPanel.add(buttonPanel);
+
+        reassignDialog.add(contentPanel, BorderLayout.CENTER);
+        reassignDialog.setVisible(true);
+    }
+
+    private void performReassignTask(String currentUser, String taskTitle, String newUser) {
+        showLoadingDialog("Переназначение задачи '" + taskTitle + "' пользователю " + newUser + "...");
+
+        new Thread(() -> {
+            try {
+                // Сначала получаем задачу
+                Task task = findTaskByUsernameAndTitle(currentUser, taskTitle);
+                if (task == null) {
+                    throw new RuntimeException("Задача не найдена");
+                }
+
+                // Создаем задачу у нового пользователя
+                String assignUrl = "http://localhost:8080/assigntask?username=" +
+                        java.net.URLEncoder.encode(newUser, "UTF-8");
+
+                String taskJson = convertTaskToJson(task);
+
+                HttpClient client = HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(10))
+                        .build();
+
+                HttpRequest assignRequest = HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(assignUrl))
+                        .header("Authorization", "Bearer " + authToken)
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(taskJson))
+                        .build();
+
+                HttpResponse<String> assignResponse = client.send(assignRequest, HttpResponse.BodyHandlers.ofString());
+
+                if (assignResponse.statusCode() == 200) {
+                    // Удаляем задачу у старого пользователя
+                    String deleteUrl = "http://localhost:8080/deletetask/" +
+                            java.net.URLEncoder.encode(currentUser, "UTF-8") + "/" +
+                            java.net.URLEncoder.encode(taskTitle, "UTF-8");
+
+                    HttpRequest deleteRequest = HttpRequest.newBuilder()
+                            .uri(java.net.URI.create(deleteUrl))
+                            .header("Authorization", "Bearer " + authToken)
+                            .DELETE()
+                            .build();
+
+                    HttpResponse<String> deleteResponse = client.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
+
+                    SwingUtilities.invokeLater(() -> {
+                        hideLoadingDialog();
+
+                        if (deleteResponse.statusCode() == 200) {
+                            showSuccessMessage("Задача '" + taskTitle + "' успешно переназначена от " + currentUser + " к " + newUser);
+                            refreshUserManagement();
+                        } else {
+                            showErrorMessage("Задача назначена новому пользователю, но не удалена у старого: " + deleteResponse.body());
+                        }
+                    });
+                } else {
+                    SwingUtilities.invokeLater(() -> {
+                        hideLoadingDialog();
+                        showErrorMessage("Ошибка при назначении задачи новому пользователю: " + assignResponse.body());
+                    });
+                }
+
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    showErrorMessage("Ошибка при переназначении задачи: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    // Редактирование задачи
+    private void editSelectedTask() {
+        JList<String> usersList = findUsersList();
+        JList<String> tasksList = findTasksList();
+
+        if (usersList == null || tasksList == null) return;
+
+        String selectedUser = usersList.getSelectedValue();
+        String selectedTask = tasksList.getSelectedValue();
+
+        if (selectedUser == null || selectedTask == null ||
+                selectedUser.equals("Пользователи не найдены") || selectedTask.equals("Задачи не найдены")) {
+            showErrorMessage("Выберите пользователя и задачу");
+            return;
+        }
+
+        // Находим полную информацию о задаче
+        String taskTitle = selectedTask.split(" \\| ")[0];
+        Task task = findTaskByUsernameAndTitle(selectedUser, taskTitle);
+
+        if (task != null) {
+            showEditTaskDialog(task, selectedUser);
+        } else {
+            showErrorMessage("Не удалось найти задачу для редактирования");
+        }
+    }
+
+    private void showEditTaskDialog(Task task, String username) {
+        JDialog editDialog = new JDialog(this, "Редактирование задачи", true);
+        editDialog.setSize(500, 600);
+        editDialog.setLocationRelativeTo(this);
+        editDialog.setLayout(new BorderLayout());
+
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(Color.WHITE);
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JLabel titleLabel = new JLabel("Редактирование задачи", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel userLabel = new JLabel("Пользователь: " + username, SwingConstants.CENTER);
+        userLabel.setFont(new Font("Arial", Font.PLAIN, 14));
+        userLabel.setForeground(Color.GRAY);
+        userLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Поля для редактирования
+        JPanel fieldsPanel = new JPanel();
+        fieldsPanel.setLayout(new BoxLayout(fieldsPanel, BoxLayout.Y_AXIS));
+        fieldsPanel.setBackground(Color.WHITE);
+        fieldsPanel.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
+        fieldsPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        // Название задачи
+        JLabel titleFieldLabel = new JLabel("Название задачи:");
+        titleFieldLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        titleFieldLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JTextField titleField = new JTextField(task.getTitle());
+        titleField.setMaximumSize(new Dimension(400, 35));
+        titleField.setFont(new Font("Arial", Font.PLAIN, 12));
+
+        // Описание
+        JLabel descLabel = new JLabel("Описание:");
+        descLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        descLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JTextArea descArea = new JTextArea(task.getDescription(), 4, 20);
+        descArea.setLineWrap(true);
+        descArea.setWrapStyleWord(true);
+        descArea.setFont(new Font("Arial", Font.PLAIN, 12));
+        JScrollPane descScroll = new JScrollPane(descArea);
+        descScroll.setMaximumSize(new Dimension(400, 100));
+
+        // Статус
+        JLabel statusLabel = new JLabel("Статус:");
+        statusLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        statusLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        String[] statusOptions = {"НЕ_НАЧАТА", "В_РАБОТЕ", "ЗАВЕРШЕНА", "НА_ДОРАБОТКЕ"};
+        JComboBox<String> statusCombo = new JComboBox<>(statusOptions);
+        statusCombo.setSelectedItem(task.getStatus());
+        statusCombo.setMaximumSize(new Dimension(400, 35));
+
+        // Приоритет
+        JLabel priorityLabel = new JLabel("Приоритет:");
+        priorityLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        priorityLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        String[] priorityOptions = {"СРОЧНАЯ", "НАДО_ПОТОРОПИТЬСЯ", "МОЖЕТ_ПОДОЖДАТЬ"};
+        JComboBox<String> priorityCombo = new JComboBox<>(priorityOptions);
+        priorityCombo.setSelectedItem(task.getImportance());
+        priorityCombo.setMaximumSize(new Dimension(400, 35));
+
+        // Дедлайн
+        JLabel deadlineLabel = new JLabel("Дедлайн (гггг-мм-дд):");
+        deadlineLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        deadlineLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        String deadline = task.getDeadline() != null ? task.getDeadline().split("T")[0] : "";
+        JTextField deadlineField = new JTextField(deadline);
+        deadlineField.setMaximumSize(new Dimension(400, 35));
+        deadlineField.setFont(new Font("Arial", Font.PLAIN, 12));
+
+        // Добавляем поля
+        fieldsPanel.add(titleFieldLabel);
+        fieldsPanel.add(Box.createVerticalStrut(5));
+        fieldsPanel.add(titleField);
+        fieldsPanel.add(Box.createVerticalStrut(15));
+        fieldsPanel.add(descLabel);
+        fieldsPanel.add(Box.createVerticalStrut(5));
+        fieldsPanel.add(descScroll);
+        fieldsPanel.add(Box.createVerticalStrut(15));
+        fieldsPanel.add(statusLabel);
+        fieldsPanel.add(Box.createVerticalStrut(5));
+        fieldsPanel.add(statusCombo);
+        fieldsPanel.add(Box.createVerticalStrut(15));
+        fieldsPanel.add(priorityLabel);
+        fieldsPanel.add(Box.createVerticalStrut(5));
+        fieldsPanel.add(priorityCombo);
+        fieldsPanel.add(Box.createVerticalStrut(15));
+        fieldsPanel.add(deadlineLabel);
+        fieldsPanel.add(Box.createVerticalStrut(5));
+        fieldsPanel.add(deadlineField);
+
+        // Кнопки
+        JButton saveButton = new JButton("Сохранить");
+        JButton cancelButton = new JButton("Отмена");
+
+        styleManagementButton(saveButton, new Color(46, 204, 113));
+        styleManagementButton(cancelButton, new Color(108, 117, 125));
+
+        saveButton.addActionListener(e -> {
+            // Создаем обновленную задачу
+            Task updatedTask = new Task();
+            updatedTask.setTitle(titleField.getText());
+            updatedTask.setDescription(descArea.getText());
+            updatedTask.setStatus((String) statusCombo.getSelectedItem());
+            updatedTask.setImportance((String) priorityCombo.getSelectedItem());
+            updatedTask.setDeadline(deadlineField.getText() + "T00:00:00");
+
+            performUpdateTask(updatedTask);
+            editDialog.dispose();
+        });
+
+        cancelButton.addActionListener(e -> editDialog.dispose());
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
+        buttonPanel.setBackground(Color.WHITE);
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(saveButton);
+
+        contentPanel.add(titleLabel);
+        contentPanel.add(Box.createVerticalStrut(5));
+        contentPanel.add(userLabel);
+        contentPanel.add(Box.createVerticalStrut(20));
+        contentPanel.add(fieldsPanel);
+        contentPanel.add(Box.createVerticalStrut(20));
+        contentPanel.add(buttonPanel);
+
+        editDialog.add(contentPanel, BorderLayout.CENTER);
+        editDialog.setVisible(true);
+    }
+
+    private void performUpdateTask(Task task) {
+        showLoadingDialog("Сохранение изменений задачи...");
+
+        new Thread(() -> {
+            try {
+                String url = "http://localhost:8080/updatetask";
+
+                String taskJson = convertTaskToJson(task);
+
+                HttpClient client = HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(10))
+                        .build();
+
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(url))
+                        .header("Authorization", "Bearer " + authToken)
+                        .header("Content-Type", "application/json")
+                        .PUT(HttpRequest.BodyPublishers.ofString(taskJson))
+                        .build();
+
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+
+                    if (response.statusCode() == 200) {
+                        showSuccessMessage("Задача '" + task.getTitle() + "' успешно обновлена");
+                        refreshUserManagement();
+                    } else {
+                        showErrorMessage("Ошибка при обновлении задачи: " + response.body());
+                    }
+                });
+
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    showErrorMessage("Ошибка при обновлении задачи: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    // Вспомогательные методы
+    private JList<String> findUsersList() {
+        return findComponentRecursive(JList.class, this);
+    }
+
+    private JList<String> findTasksList() {
+        return findComponentRecursive(JList.class, this);
+    }
+
+    private void refreshUserManagement() {
+        JList<String> usersList = findUsersList();
+        JList<String> tasksList = findTasksList();
+
+        if (usersList != null && tasksList != null) {
+            DefaultListModel<String> usersModel = (DefaultListModel<String>) usersList.getModel();
+            DefaultListModel<String> tasksModel = (DefaultListModel<String>) tasksList.getModel();
+            loadUsers(usersModel, tasksModel, tasksList);
+        }
+    }
+
+    // Методы для уведомлений
+    private JDialog loadingDialog;
+
+    private void showUserManagement() {
+        JDialog userManagementDialog = new JDialog(this, "Управление пользователями", true);
+        userManagementDialog.setSize(1200, 800);
+        userManagementDialog.setLocationRelativeTo(this);
+        userManagementDialog.setLayout(new BorderLayout());
+        userManagementDialog.setResizable(true);
+
+        // Основная панель
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBackground(Color.WHITE);
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        // Заголовок
+        JPanel headerPanel = createUserManagementHeader();
+
+        // Панель с пользователями и задачами
+        JSplitPane splitPane = createUserManagementSplitPane();
+
+        // Панель действий
+        JPanel actionPanel = createUserManagementActionPanel(userManagementDialog);
+
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
+        mainPanel.add(splitPane, BorderLayout.CENTER);
+        mainPanel.add(actionPanel, BorderLayout.SOUTH);
+
+        userManagementDialog.add(mainPanel, BorderLayout.CENTER);
+        userManagementDialog.setVisible(true);
+    }
+
+    private JPanel createUserManagementHeader() {
+        JPanel headerPanel = new JPanel();
+        headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.Y_AXIS));
+        headerPanel.setBackground(Color.WHITE);
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
+
+        JLabel iconLabel = new JLabel("👥", SwingConstants.CENTER);
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
+        iconLabel.setForeground(new Color(155, 89, 182));
+        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel titleLabel = new JLabel("Управление пользователями", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        titleLabel.setForeground(new Color(44, 62, 80));
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel subtitleLabel = new JLabel("Управление пользователями и их задачами", SwingConstants.CENTER);
+        subtitleLabel.setFont(new Font("Arial", Font.PLAIN, 14));
+        subtitleLabel.setForeground(new Color(127, 140, 141));
+        subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        headerPanel.add(iconLabel);
+        headerPanel.add(Box.createVerticalStrut(10));
+        headerPanel.add(titleLabel);
+        headerPanel.add(Box.createVerticalStrut(5));
+        headerPanel.add(subtitleLabel);
+
+        return headerPanel;
+    }
+
+    private JSplitPane createUserManagementSplitPane() {
+        // Панель пользователей
+        JPanel usersPanel = new JPanel(new BorderLayout());
+        usersPanel.setBackground(Color.WHITE);
+        usersPanel.setBorder(BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                "Пользователи"
+        ));
+
+        DefaultListModel<String> usersListModel = new DefaultListModel<>();
+        JList<String> usersList = new JList<>(usersListModel);
+        usersList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        usersList.setFont(new Font("Arial", Font.PLAIN, 12));
+        usersList.setBackground(new Color(248, 249, 250));
+
+        JScrollPane usersScrollPane = new JScrollPane(usersList);
+        usersPanel.add(usersScrollPane, BorderLayout.CENTER);
+
+        // Панель задач выбранного пользователя
+        JPanel tasksPanel = new JPanel(new BorderLayout());
+        tasksPanel.setBackground(Color.WHITE);
+        tasksPanel.setBorder(BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                "Задачи пользователя"
+        ));
+
+        // Используем таблицу вместо списка для задач
+        String[] columnNames = {"Название", "Статус", "Важность", "Дедлайн"};
+        DefaultTableModel tasksTableModel = new DefaultTableModel(columnNames, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+
+        JTable tasksTable = new JTable(tasksTableModel);
+        tasksTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tasksTable.setFont(new Font("Arial", Font.PLAIN, 12));
+        tasksTable.setBackground(new Color(248, 249, 250));
+        tasksTable.setRowHeight(25);
+
+        // Настраиваем ширину колонок
+        tasksTable.getColumnModel().getColumn(0).setPreferredWidth(200); // Название
+        tasksTable.getColumnModel().getColumn(1).setPreferredWidth(120); // Статус
+        tasksTable.getColumnModel().getColumn(2).setPreferredWidth(120); // Важность
+        tasksTable.getColumnModel().getColumn(3).setPreferredWidth(100); // Дедлайн
+
+        JScrollPane tasksScrollPane = new JScrollPane(tasksTable);
+        tasksPanel.add(tasksScrollPane, BorderLayout.CENTER);
+
+        // Загрузка пользователей
+        loadUsers(usersListModel, tasksTableModel, tasksTable);
+
+        // Обработчик выбора пользователя
+        usersList.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                String selectedUser = usersList.getSelectedValue();
+                if (selectedUser != null && !selectedUser.startsWith("Пользователи не найдены") && !selectedUser.startsWith("Ошибка")) {
+                    loadUserTasks(selectedUser, tasksTableModel);
+                }
+            }
+        });
+
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, usersPanel, tasksPanel);
+        splitPane.setDividerLocation(300);
+        splitPane.setResizeWeight(0.3);
+
+        return splitPane;
+    }
+
+    // Загрузка задач пользователя
+    private void loadUserTasks(String username, DefaultTableModel tasksTableModel) {
+        showLoadingDialog("Загрузка задач пользователя...");
+
+        new Thread(() -> {
+            try {
+                List<User> users = getAllUsersWithTasks();
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    tasksTableModel.setRowCount(0);
+
+                    if (users != null) {
+                        for (User user : users) {
+                            if (user.getUsername().equals(username) && user.getTasks() != null) {
+                                for (Task task : user.getTasks()) {
+                                    String deadline = task.getDeadline() != null ?
+                                            task.getDeadline().split("T")[0] : "нет дедлайна";
+                                    tasksTableModel.addRow(new Object[]{
+                                            task.getTitle(),
+                                            getStatusDisplayName(task.getStatus()),
+                                            getImportanceDisplayName(task.getImportance()),
+                                            deadline
+                                    });
+                                }
+                                break;
+                            }
+                        }
+                    }
+                });
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    showErrorMessage("Ошибка загрузки задач: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    private void performDeleteUser(String username, JDialog parentDialog) {
+        showLoadingDialog("Удаление пользователя " + username + "...");
+
+        new Thread(() -> {
+            try {
+                String url = "http://localhost:8080/deleteuser/" +
+                        java.net.URLEncoder.encode(username, "UTF-8");
+
+                HttpClient client = HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(10))
+                        .build();
+
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(url))
+                        .header("Authorization", "Bearer " + authToken)
+                        .DELETE()
+                        .build();
+
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+
+                    if (response.statusCode() == 200) {
+                        showSuccessMessage("Пользователь '" + username + "' успешно удален");
+                        // Автоматическое обновление вместо кнопки
+                        refreshUserManagement(parentDialog);
+                    } else {
+                        showErrorMessage("Ошибка при удалении пользователя: " + response.body());
+                    }
+                });
+
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    showErrorMessage("Ошибка при удалении пользователя: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    private void showReassignDialog(String currentUser, String taskTitle, JDialog parentDialog) {
+        JDialog reassignDialog = new JDialog(parentDialog, "Переназначение задачи", true);
+        reassignDialog.setSize(400, 300);
+        reassignDialog.setLocationRelativeTo(parentDialog);
+        reassignDialog.setLayout(new BorderLayout());
+
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(Color.WHITE);
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JLabel titleLabel = new JLabel("Переназначение задачи", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel taskInfoLabel = new JLabel("Задача: " + taskTitle, SwingConstants.CENTER);
+        taskInfoLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        taskInfoLabel.setForeground(Color.GRAY);
+        taskInfoLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel currentUserLabel = new JLabel("Текущий пользователь: " + currentUser, SwingConstants.CENTER);
+        currentUserLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        currentUserLabel.setForeground(Color.GRAY);
+        currentUserLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel newUserLabel = new JLabel("Новый пользователь:");
+        newUserLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        newUserLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JComboBox<String> usersComboBox = new JComboBox<>();
+        usersComboBox.setPreferredSize(new Dimension(300, 30));
+        usersComboBox.setMaximumSize(new Dimension(300, 30));
+
+        JButton reassignButton = new JButton("Переназначить");
+        JButton cancelButton = new JButton("Отмена");
+
+        styleManagementButton(reassignButton, new Color(52, 152, 219));
+        styleManagementButton(cancelButton, new Color(108, 117, 125));
+
+        reassignButton.addActionListener(e -> {
+            String newUser = (String) usersComboBox.getSelectedItem();
+            if (newUser != null && !newUser.equals(currentUser)) {
+                reassignDialog.dispose();
+                performReassignTask(currentUser, taskTitle, newUser, parentDialog);
+            } else {
+                showErrorMessage("Выберите другого пользователя");
+            }
+        });
+
+        cancelButton.addActionListener(e -> reassignDialog.dispose());
+
+        // Загрузка пользователей для выбора
+        loadUsersForReassign(usersComboBox, currentUser);
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        buttonPanel.setBackground(Color.WHITE);
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(reassignButton);
+
+        contentPanel.add(titleLabel);
+        contentPanel.add(Box.createVerticalStrut(10));
+        contentPanel.add(taskInfoLabel);
+        contentPanel.add(Box.createVerticalStrut(5));
+        contentPanel.add(currentUserLabel);
+        contentPanel.add(Box.createVerticalStrut(20));
+        contentPanel.add(newUserLabel);
+        contentPanel.add(Box.createVerticalStrut(5));
+        contentPanel.add(usersComboBox);
+        contentPanel.add(Box.createVerticalStrut(20));
+        contentPanel.add(buttonPanel);
+
+        reassignDialog.add(contentPanel, BorderLayout.CENTER);
+        reassignDialog.setVisible(true);
+    }
+
+    private void performUpdateTask(Task task, JDialog parentDialog) {
+        showLoadingDialog("Сохранение изменений задачи...");
+
+        new Thread(() -> {
+            try {
+                String url = "http://localhost:8080/updatetask";
+
+                String taskJson = convertTaskToJson(task);
+
+                HttpClient client = HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(10))
+                        .build();
+
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(url))
+                        .header("Authorization", "Bearer " + authToken)
+                        .header("Content-Type", "application/json")
+                        .PUT(HttpRequest.BodyPublishers.ofString(taskJson))
+                        .build();
+
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+
+                    if (response.statusCode() == 200) {
+                        showSuccessMessage("Задача '" + task.getTitle() + "' успешно обновлена");
+                        refreshUserManagement(parentDialog);
+                    } else {
+                        showErrorMessage("Ошибка при обновлении задачи: " + response.body());
+                    }
+                });
+
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    showErrorMessage("Ошибка при обновлении задачи: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    private void loadUsersForReassign(JComboBox<String> comboBox, String excludeUser) {
+        showLoadingDialog("Загрузка списка пользователей...");
+
+        new Thread(() -> {
+            try {
+                List<User> users = getAllUsersWithTasks();
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    comboBox.removeAllItems();
+                    if (users != null && !users.isEmpty()) {
+                        for (User user : users) {
+                            if (!user.getUsername().equals(excludeUser)) {
+                                comboBox.addItem(user.getUsername());
+                            }
+                        }
+                        if (comboBox.getItemCount() == 0) {
+                            showErrorMessage("Нет других пользователей для переназначения");
+                        }
+                    } else {
+                        showErrorMessage("Не удалось загрузить список пользователей");
+                    }
+                });
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    showErrorMessage("Ошибка загрузки пользователей: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    private Task findTaskByUsernameAndTitle(String username, String title) {
+        try {
+            List<User> users = getAllUsersWithTasks();
+            for (User user : users) {
+                if (user.getUsername().equals(username) && user.getTasks() != null) {
+                    for (Task task : user.getTasks()) {
+                        if (task.getTitle().equals(title)) {
+                            return task;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private void reassignSelectedTask(JDialog parentDialog) {
+        JList<String> usersList = findUsersList(parentDialog);
+        JTable tasksTable = findTasksTable(parentDialog);
+
+        if (usersList == null || tasksTable == null) {
+            showErrorMessage("Не удалось найти компоненты интерфейса");
+            return;
+        }
+
+        String selectedUser = usersList.getSelectedValue();
+        int selectedTaskRow = tasksTable.getSelectedRow();
+
+        if (selectedUser == null || selectedUser.equals("Пользователи не найдены") || selectedUser.startsWith("Ошибка")) {
+            showErrorMessage("Выберите пользователя");
+            return;
+        }
+
+        if (selectedTaskRow == -1) {
+            showErrorMessage("Выберите задачу для переназначения");
+            return;
+        }
+
+        String taskTitle = (String) tasksTable.getValueAt(selectedTaskRow, 0);
+
+        // Проверяем, что задача существует
+        Task task = findTaskByUsernameAndTitle(selectedUser, taskTitle);
+        if (task == null) {
+            showErrorMessage("Не удалось найти задачу для переназначения");
+            return;
+        }
+
+        showReassignDialog(selectedUser, taskTitle, parentDialog);
+    }
+
+    private void editSelectedTask(JDialog parentDialog) {
+        JList<String> usersList = findUsersList(parentDialog);
+        JTable tasksTable = findTasksTable(parentDialog);
+
+        if (usersList == null || tasksTable == null) {
+            showErrorMessage("Не удалось найти компоненты интерфейса");
+            return;
+        }
+
+        String selectedUser = usersList.getSelectedValue();
+        int selectedTaskRow = tasksTable.getSelectedRow();
+
+        if (selectedUser == null || selectedUser.equals("Пользователи не найдены") || selectedUser.startsWith("Ошибка")) {
+            showErrorMessage("Выберите пользователя");
+            return;
+        }
+
+        if (selectedTaskRow == -1) {
+            showErrorMessage("Выберите задачу для редактирования");
+            return;
+        }
+
+        String taskTitle = (String) tasksTable.getValueAt(selectedTaskRow, 0);
+        Task task = findTaskByUsernameAndTitle(selectedUser, taskTitle);
+
+        if (task != null) {
+            showEditTaskDialog(task, selectedUser, parentDialog);
+        } else {
+            showErrorMessage("Не удалось найти задачу для редактирования");
+        }
+    }
+
+    private JPanel createUserManagementActionPanel(JDialog parentDialog) {
+        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 10));
+        actionPanel.setBackground(Color.WHITE);
+        actionPanel.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
+
+        JButton deleteUserButton = new JButton("Удалить пользователя");
+        JButton deleteTaskButton = new JButton("Удалить задачу");
+        JButton reassignTaskButton = new JButton("Переназначить задачу");
+        JButton editTaskButton = new JButton("Редактировать задачу");
+        JButton closeButton = new JButton("Закрыть");
+
+        styleManagementButton(deleteUserButton, new Color(231, 76, 60));
+        styleManagementButton(deleteTaskButton, new Color(231, 76, 60));
+        styleManagementButton(reassignTaskButton, new Color(52, 152, 219));
+        styleManagementButton(editTaskButton, new Color(241, 196, 15));
+        styleManagementButton(closeButton, new Color(108, 117, 125));
+
+        // Обработчики действий с передачей parentDialog
+        deleteUserButton.addActionListener(e -> deleteSelectedUser(parentDialog));
+        deleteTaskButton.addActionListener(e -> deleteSelectedTask(parentDialog));
+        reassignTaskButton.addActionListener(e -> reassignSelectedTask(parentDialog));
+        editTaskButton.addActionListener(e -> editSelectedTask(parentDialog));
+        closeButton.addActionListener(e -> parentDialog.dispose());
+
+        actionPanel.add(deleteUserButton);
+        actionPanel.add(deleteTaskButton);
+        actionPanel.add(reassignTaskButton);
+        actionPanel.add(editTaskButton);
+        actionPanel.add(closeButton);
+
+        return actionPanel;
+    }
+
+    private void hideLoadingDialog() {
+        SwingUtilities.invokeLater(() -> {
+            if (loadingDialog != null) {
+                loadingDialog.dispose();
+                loadingDialog = null;
+            }
+        });
+    }
+
+    private void refreshUserManagement(JDialog parentDialog) {
+        JList<String> usersList = findUsersList(parentDialog);
+        JTable tasksTable = findTasksTable(parentDialog);
+
+        if (usersList != null && tasksTable != null) {
+            DefaultListModel<String> usersModel = (DefaultListModel<String>) usersList.getModel();
+            DefaultTableModel tasksModel = (DefaultTableModel) tasksTable.getModel();
+
+            // Сохраняем текущее выделение
+            String selectedUser = usersList.getSelectedValue();
+            int selectedRow = tasksTable.getSelectedRow();
+
+            // Очищаем и перезагружаем данные
+            usersModel.clear();
+            tasksModel.setRowCount(0);
+            loadUsers(usersModel, tasksModel, tasksTable);
+
+            // Восстанавливаем выделение
+            if (selectedUser != null) {
+                for (int i = 0; i < usersModel.size(); i++) {
+                    if (selectedUser.equals(usersModel.getElementAt(i))) {
+                        usersList.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
+
+            // Обновляем интерфейс
+            usersList.repaint();
+            tasksTable.repaint();
+
+            System.out.println("DEBUG: User management refreshed");
+        } else {
+            System.out.println("DEBUG: Could not find components to refresh");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private JList<String> findUsersList(JDialog parentDialog) {
+        return findComponentRecursive(JList.class, parentDialog);
+    }
+
+    @SuppressWarnings("unchecked")
+    private JTable findTasksTable(JDialog parentDialog) {
+        return findComponentRecursive(JTable.class, parentDialog);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T extends Component> T findComponentRecursive(Class<T> clazz, Container container) {
+        for (Component comp : container.getComponents()) {
+            if (clazz.isInstance(comp)) {
+                return (T) comp;
+            }
+            if (comp instanceof Container) {
+                T found = findComponentRecursive(clazz, (Container) comp);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private void loadUsers(DefaultListModel<String> usersListModel, DefaultTableModel tasksTableModel, JTable tasksTable) {
+        showLoadingDialog("Загрузка пользователей...");
+
+        new Thread(() -> {
+            try {
+                List<User> users = getAllUsersWithTasks();
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    usersListModel.clear();
+                    tasksTableModel.setRowCount(0);
+
+                    if (users != null && !users.isEmpty()) {
+                        for (User user : users) {
+                            usersListModel.addElement(user.getUsername());
+                        }
+                        System.out.println("DEBUG: Loaded " + users.size() + " users");
+                    } else {
+                        usersListModel.addElement("Пользователи не найдены");
+                    }
+                });
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    usersListModel.clear();
+                    usersListModel.addElement("Ошибка загрузки: " + e.getMessage());
+                    showErrorMessage("Ошибка загрузки пользователей: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    // Метод для назначения задачи пользователю (аналогично созданию новой задачи)
+    private boolean assignTaskToUser(Task task, String username) {
+        try {
+            String url = "http://localhost:8080/assigntask?username=" +
+                    java.net.URLEncoder.encode(username, "UTF-8");
+
+            // Создаем копию задачи для нового пользователя
+            Task taskForNewUser = new Task();
+            taskForNewUser.setTitle(task.getTitle());
+            taskForNewUser.setDescription(task.getDescription());
+            taskForNewUser.setStatus(task.getStatus());
+            taskForNewUser.setImportance(task.getImportance());
+            taskForNewUser.setDeadline(task.getDeadline());
+
+            // Устанавливаем assignee
+            User assignee = new User();
+            assignee.setUsername(username);
+            taskForNewUser.setAssignee(assignee);
+
+            String taskJson = convertTaskToJson(taskForNewUser);
+            System.out.println("DEBUG: Assign task JSON: " + taskJson);
+
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .build();
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(url))
+                    .header("Authorization", "Bearer " + authToken)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(taskJson))
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            System.out.println("DEBUG: Assign task response: " + response.statusCode());
+            System.out.println("DEBUG: Assign task body: " + response.body());
+
+            return response.statusCode() == 200;
+
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error assigning task to user: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private String convertTaskToJson(Task task) {
+        try {
+            StringBuilder json = new StringBuilder();
+            json.append("{");
+
+            // Добавляем assignedUser если он есть
+            if (task.getAssignee() != null && task.getAssignee().getUsername() != null) {
+                json.append("\"assignedUser\":\"").append(escapeJsonString(task.getAssignee().getUsername())).append("\",");
+            }
+
+            if (task.getTitle() != null) {
+                json.append("\"title\":\"").append(escapeJsonString(task.getTitle())).append("\",");
+            }
+            if (task.getDescription() != null) {
+                json.append("\"description\":\"").append(escapeJsonString(task.getDescription())).append("\",");
+            }
+            if (task.getStatus() != null) {
+                json.append("\"status\":\"").append(escapeJsonString(task.getStatus())).append("\",");
+            }
+            if (task.getImportance() != null) {
+                json.append("\"importance\":\"").append(escapeJsonString(task.getImportance())).append("\",");
+            }
+            if (task.getDeadline() != null) {
+                json.append("\"deadline\":\"").append(escapeJsonString(task.getDeadline())).append("\",");
+            }
+
+            // Убираем последнюю запятую
+            if (json.charAt(json.length() - 1) == ',') {
+                json.deleteCharAt(json.length() - 1);
+            }
+
+            json.append("}");
+            return json.toString();
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error converting task to JSON: " + e.getMessage());
+            return "{}";
+        }
+    }
+
+    private String escapeJsonString(String text) {
+        if (text == null) return "";
+        return text.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+    }
+
+    // Метод для удаления задачи у пользователя (оставляем как есть, так как он работает)
+    private boolean deleteTaskFromUser(String username, String taskTitle) {
+        try {
+            String url = "http://localhost:8080/deletetask/" +
+                    java.net.URLEncoder.encode(username, "UTF-8") + "/" +
+                    java.net.URLEncoder.encode(taskTitle, "UTF-8");
+
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .build();
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(url))
+                    .header("Authorization", "Bearer " + authToken)
+                    .DELETE()
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            System.out.println("DEBUG: Delete task response: " + response.statusCode());
+            System.out.println("DEBUG: Delete task body: " + response.body());
+
+            return response.statusCode() == 200;
+
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error deleting task from user: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private boolean deleteTaskViaKafka(String username, Long taskId) {
+        try {
+            KafkaTaskProducer kafkaTaskProducer = new KafkaTaskProducer();
+
+            System.out.println("DEBUG: Отправка удаления в Kafka для пользователя: " + username + ", ID задачи: " + taskId);
+
+            // Используем метод с ID задачи
+            kafkaTaskProducer.sendTaskDeletion(username, taskId);
+
+            // Ждем немного для обработки
+            Thread.sleep(500);
+
+            return true;
+
+        } catch (Exception e) {
+            System.out.println("DEBUG: Ошибка удаления задачи через Kafka: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private String createDeletionJson(String username, String taskTitle) {
+        try {
+            StringBuilder json = new StringBuilder();
+            json.append("{");
+            json.append("\"username\":\"").append(escapeJsonString(username)).append("\",");
+            json.append("\"taskTitle\":\"").append(escapeJsonString(taskTitle)).append("\"");
+            json.append("}");
+
+            System.out.println("DEBUG: Deletion JSON: " + json.toString());
+            return json.toString();
+
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error creating deletion JSON: " + e.getMessage());
+            return "{}";
+        }
+    }
+
+    private String convertTaskToJsonForKafka(Task task, String newUser) {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            Map<String, Object> taskData = new HashMap<>();
+
+            // Все основные поля задачи
+            taskData.put("title", task.getTitle());
+            taskData.put("description", task.getDescription() != null ? task.getDescription() : "");
+            taskData.put("status", task.getStatus() != null ? task.getStatus() : "НЕ_НАЧАТА");
+            taskData.put("importance", task.getImportance() != null ? task.getImportance() : "МОЖЕТ_ПОДОЖДАТЬ");
+
+            if (task.getDeadline() != null) {
+                taskData.put("deadline", task.getDeadline());
+            } else {
+                // Устанавливаем дедлайн по умолчанию (завтра)
+                String defaultDeadline = java.time.LocalDateTime.now().plusDays(1)
+                        .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                taskData.put("deadline", defaultDeadline);
+            }
+
+            taskData.put("assignedUser", newUser);
+
+            String taskJson = objectMapper.writeValueAsString(taskData);
+            System.out.println("DEBUG: Task JSON for Kafka: " + taskJson);
+            return taskJson;
+
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error converting task to JSON for Kafka: " + e.getMessage());
+            e.printStackTrace();
+            return "{}";
+        }
+
+    }
+
+    private Task parseSingleTaskImproved(String taskJson) {
+        try {
+            System.out.println("DEBUG: Admin - Parsing task: " + taskJson);
+
+            // Извлекаем все поля, включая id
+            String idStr = extractValueImproved(taskJson, "id");
+            String title = extractValueImproved(taskJson, "title");
+            String description = extractValueImproved(taskJson, "description");
+            String status = extractValueImproved(taskJson, "status");
+            String importance = extractValueImproved(taskJson, "importance");
+            String deadline = extractValueImproved(taskJson, "deadline");
+
+            if (title != null) {
+                Task task = new Task();
+
+                // Устанавливаем taskId если он есть
+                if (idStr != null && !idStr.isEmpty()) {
+                    try {
+                        task.setTaskId(Long.parseLong(idStr));
+                        System.out.println("DEBUG: Admin - Set task ID: " + idStr + " for task: " + title);
+                    } catch (NumberFormatException e) {
+                        System.out.println("DEBUG: Admin - Error parsing task ID: " + idStr);
+                    }
+                }
+
+                task.setTitle(title);
+                task.setDescription(description);
+                task.setStatus(status);
+                task.setImportance(importance);
+                task.setDeadline(deadline);
+
+                // Парсинг комментариев (остальной код без изменений)
+                if (taskJson.contains("\"comments\":")) {
+                    int commentsStart = taskJson.indexOf("\"comments\":[") + 11;
+                    int commentsEnd = findMatchingBracket(taskJson, commentsStart - 1);
+                    if (commentsEnd > commentsStart) {
+                        String commentsArray = taskJson.substring(commentsStart, commentsEnd).trim();
+                        List<Comment> comments = parseCommentsArrayImproved(commentsArray);
+                        task.setComments(comments);
+                        System.out.println("DEBUG: Admin - Found " + comments.size() + " comments for task: " + title);
+                    }
+                }
+                return task;
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: Admin - Error parsing task: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private Task parseSingleTask(String taskJson) {
+        try {
+            System.out.println("DEBUG: Admin - Parsing task: " + taskJson);
+
+            String idStr = extractValue(taskJson, "id");
+            String title = extractValue(taskJson, "title");
+            String description = extractValue(taskJson, "description");
+            String status = extractValue(taskJson, "status");
+            String importance = extractValue(taskJson, "importance");
+            String deadline = extractValue(taskJson, "deadline");
+
+            if (title != null) {
+                Task task = new Task();
+
+                // Устанавливаем taskId
+                if (idStr != null && !idStr.isEmpty()) {
+                    try {
+                        task.setTaskId(Long.parseLong(idStr));
+                        System.out.println("DEBUG: Admin - Set task ID: " + idStr + " for task: " + title);
+                    } catch (NumberFormatException e) {
+                        System.out.println("DEBUG: Admin - Error parsing task ID: " + idStr);
+                    }
+                }
+
+                task.setTitle(title);
+                task.setDescription(description);
+                task.setStatus(status);
+                task.setImportance(importance);
+                task.setDeadline(deadline);
+
+                // Остальной код без изменений...
+                if (taskJson.contains("\"comments\":")) {
+                    int commentsStart = taskJson.indexOf("\"comments\":[") + 11;
+                    int commentsEnd = taskJson.indexOf("]", commentsStart);
+                    if (commentsEnd > commentsStart) {
+                        String commentsArray = taskJson.substring(commentsStart, commentsEnd);
+                        List<Comment> comments = parseCommentsArray(commentsArray);
+                        task.setComments(comments);
+                        System.out.println("DEBUG: Admin - Found " + comments.size() + " comments for task: " + title);
+                    }
+                }
+                return task;
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: Admin - Error parsing task: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private void performReassignTask(String currentUser, String taskTitle, String newUser, JDialog parentDialog) {
+        System.out.println("DEBUG: Starting reassign task - currentUser: " + currentUser +
+                ", taskTitle: " + taskTitle + ", newUser: " + newUser);
+
+        showLoadingDialog("Переназначение задачи '" + taskTitle + "' пользователю " + newUser + "...");
+
+        new Thread(() -> {
+            try {
+                // 1. Получаем задачу у старого пользователя
+                System.out.println("DEBUG: Finding task for user: " + currentUser + ", title: " + taskTitle);
+                Task originalTask = findTaskByUsernameAndTitle(currentUser, taskTitle);
+                if (originalTask == null) {
+                    throw new RuntimeException("Задача не найдена у пользователя " + currentUser);
+                }
+
+                Long originalTaskId = originalTask.getTaskId();
+                System.out.println("DEBUG: Original task found: " + originalTask.getTitle() + " (ID: " + originalTaskId + ")");
+
+                // 2. Сохраняем данные задачи перед удалением
+                Task taskCopy = new Task();
+                taskCopy.setTitle(originalTask.getTitle());
+                taskCopy.setDescription(originalTask.getDescription());
+                taskCopy.setStatus(originalTask.getStatus());
+                taskCopy.setImportance(originalTask.getImportance());
+                taskCopy.setDeadline(originalTask.getDeadline());
+                taskCopy.setComments(originalTask.getComments());
+
+                // 3. УДАЛЯЕМ задачу у старого пользователя через Kafka
+                System.out.println("DEBUG: Deleting task from old user via Kafka: " + currentUser + ", ID: " + originalTaskId);
+                KafkaTaskProducer kafkaTaskProducer = new KafkaTaskProducer();
+                kafkaTaskProducer.sendTaskDeletion(currentUser, originalTaskId);
+
+                // 4. Ждем удаления (небольшая задержка)
+                System.out.println("DEBUG: Waiting for deletion to process...");
+                Thread.sleep(1500);
+
+                // 5. СОЗДАЕМ задачу у нового пользователя через Kafka
+                System.out.println("DEBUG: Creating task for new user: " + newUser);
+                boolean createSuccess = createTaskForUser(taskCopy, newUser);
+                if (!createSuccess) {
+                    throw new RuntimeException("Не удалось создать задачу у нового пользователя");
+                }
+
+                // 6. Ждем создания
+                System.out.println("DEBUG: Waiting for task creation...");
+                Thread.sleep(1500);
+
+                System.out.println("DEBUG: Reassign completed successfully");
+
+                // УСПЕШНОЕ ЗАВЕРШЕНИЕ
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    showSuccessMessage("Задача '" + taskTitle + "' успешно переназначена от " + currentUser + " к " + newUser);
+                    refreshUserManagement(parentDialog);
+                });
+
+            } catch (Exception e) {
+                System.out.println("DEBUG: Exception in reassign: " + e.getMessage());
+                e.printStackTrace();
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    showErrorMessage("Ошибка при переназначении задачи: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    private boolean createTaskForUser(Task task, String username) {
+        try {
+            KafkaTaskProducer kafkaTaskProducer = new KafkaTaskProducer();
+
+            // Создаем копию задачи для нового пользователя (без ID)
+            Task taskForNewUser = new Task();
+            taskForNewUser.setTitle(task.getTitle());
+            taskForNewUser.setDescription(task.getDescription());
+            taskForNewUser.setStatus(task.getStatus());
+            taskForNewUser.setImportance(task.getImportance());
+            taskForNewUser.setDeadline(task.getDeadline());
+
+            // Комментарии тоже копируем
+            if (task.getComments() != null) {
+                taskForNewUser.setComments(new ArrayList<>(task.getComments()));
+            }
+
+            // Конвертируем задачу в JSON формат для Kafka
+            String taskJson = convertTaskToJsonForKafka(taskForNewUser, username);
+            System.out.println("DEBUG: Creating task for user: " + username + ", Task JSON: " + taskJson);
+
+            // Отправляем задачу через Kafka
+            kafkaTaskProducer.sendTask(username, taskJson);
+
+            System.out.println("DEBUG: Task creation via Kafka initiated");
+            return true;
+
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error creating task for user via Kafka: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private void performDeleteTask(String username, String taskTitle, JDialog parentDialog) {
+        showLoadingDialog("Удаление задачи '" + taskTitle + "'...");
+
+        new Thread(() -> {
+            try {
+                // 1. Находим задачу для получения ID
+                System.out.println("DEBUG: Finding task for deletion - user: " + username + ", title: " + taskTitle);
+                Task task = findTaskByUsernameAndTitle(username, taskTitle);
+                if (task == null) {
+                    throw new RuntimeException("Задача не найдена у пользователя " + username);
+                }
+
+                if (task.getTaskId() == null) {
+                    throw new RuntimeException("У задачи отсутствует ID");
+                }
+
+                System.out.println("DEBUG: Task found for deletion: " + task.getTitle() + " (ID: " + task.getTaskId() + ")");
+
+                // 2. Удаляем задачу через Kafka
+                KafkaTaskProducer kafkaTaskProducer = new KafkaTaskProducer();
+                System.out.println("DEBUG: Sending deletion to Kafka for user: " + username + ", taskId: " + task.getTaskId());
+                kafkaTaskProducer.sendTaskDeletion(username, task.getTaskId());
+
+                // 3. Ждем обработки
+                System.out.println("DEBUG: Waiting for deletion to process...");
+                Thread.sleep(1500);
+
+                // 4. Проверяем, что задача удалилась
+                System.out.println("DEBUG: Verifying task deletion...");
+                Task deletedTask = findTaskByUsernameAndTitle(username, taskTitle);
+                if (deletedTask != null) {
+                    System.out.println("DEBUG: Task still exists, trying HTTP fallback...");
+                }
+
+                System.out.println("DEBUG: Task deletion completed successfully");
+
+                // УСПЕШНОЕ ЗАВЕРШЕНИЕ
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    showSuccessMessage("Задача '" + taskTitle + "' успешно удалена");
+                    refreshUserManagement(parentDialog);
+                });
+
+            } catch (Exception e) {
+                System.out.println("DEBUG: Exception in task deletion: " + e.getMessage());
+                e.printStackTrace();
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    showErrorMessage("Ошибка при удалении задачи: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    // Обновленный метод для информационных сообщений
+    private void showInfoMessage(String message) {
+        JDialog infoDialog = createStyledDialog(
+                "Информация",
+                message,
+                "ℹ️",
+                new Color(52, 152, 219),
+                "Понятно",
+                new Color(52, 152, 219),
+                false
+        );
+        infoDialog.setVisible(true);
+    }
+
+    // Обновленный метод для сообщений об успехе
+    private void showSuccessMessage(String message) {
+        JDialog successDialog = createStyledDialog(
+                "Успех",
+                message,
+                "✅",
+                new Color(46, 204, 113),
+                "ОК",
+                new Color(46, 204, 113),
+                false
+        );
+        successDialog.setVisible(true);
+    }
+
+    // Обновленный метод для сообщений об ошибках
+    private void showErrorMessage(String message) {
+        JDialog errorDialog = createStyledDialog(
+                "Ошибка",
+                message,
+                "❌",
+                new Color(231, 76, 60),
+                "Понятно",
+                new Color(231, 76, 60),
+                false
+        );
+        errorDialog.setVisible(true);
+    }
+
+    // Универсальный метод создания красивого диалога
+    private JDialog createStyledDialog(String title, String message, String icon, Color iconColor,
+                                       String buttonText, Color buttonColor, boolean showCancel) {
+        JDialog dialog = new JDialog(this, title, true);
+        dialog.setSize(450, 300);
+        dialog.setLocationRelativeTo(this);
+        dialog.setResizable(false);
+        dialog.setLayout(new BorderLayout());
+
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(new Color(255, 255, 255));
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(30, 40, 30, 40));
+
+        // Иконка
+        JLabel iconLabel = new JLabel(icon, SwingConstants.CENTER);
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
+        iconLabel.setForeground(iconColor);
+        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Заголовок
+        JLabel titleLabel = new JLabel(title, SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
+        titleLabel.setForeground(new Color(44, 62, 80));
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Сообщение
+        JLabel messageLabel = new JLabel("<html><center>" + message + "</center></html>", SwingConstants.CENTER);
+        messageLabel.setFont(new Font("Arial", Font.PLAIN, 14));
+        messageLabel.setForeground(new Color(127, 140, 141));
+        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Панель кнопок
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
+        buttonPanel.setBackground(new Color(255, 255, 255));
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
+
+        JButton primaryButton = new JButton(buttonText);
+        styleDialogButton(primaryButton, buttonColor);
+
+        if (showCancel) {
+            JButton cancelButton = new JButton("Отмена");
+            styleDialogButton(cancelButton, new Color(108, 117, 125));
+            cancelButton.addActionListener(e -> dialog.dispose());
+            buttonPanel.add(cancelButton);
+        }
+
+        primaryButton.addActionListener(e -> dialog.dispose());
+        buttonPanel.add(primaryButton);
+
+        contentPanel.add(iconLabel);
+        contentPanel.add(Box.createVerticalStrut(15));
+        contentPanel.add(titleLabel);
+        contentPanel.add(Box.createVerticalStrut(15));
+        contentPanel.add(messageLabel);
+        contentPanel.add(Box.createVerticalStrut(25));
+        contentPanel.add(buttonPanel);
+
+        dialog.add(contentPanel, BorderLayout.CENTER);
+        dialog.getRootPane().setDefaultButton(primaryButton);
+        dialog.pack();
+
+        return dialog;
+    }
+
+    // Обновленный диалог подтверждения удаления пользователя
+    private boolean showDeleteUserConfirmation(String username) {
+        final boolean[] result = {false};
+
+        JDialog confirmDialog = new JDialog(this, "Подтверждение удаления", true);
+        confirmDialog.setSize(500, 350);
+        confirmDialog.setLocationRelativeTo(this);
+        confirmDialog.setResizable(false);
+        confirmDialog.setLayout(new BorderLayout());
+
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(new Color(255, 255, 255));
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(30, 40, 30, 40));
+
+        // Иконка
+        JLabel iconLabel = new JLabel("⚠️", SwingConstants.CENTER);
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
+        iconLabel.setForeground(new Color(231, 76, 60));
+        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Заголовок
+        JLabel titleLabel = new JLabel("Подтверждение удаления", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
+        titleLabel.setForeground(new Color(44, 62, 80));
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Сообщение
+        JLabel messageLabel = new JLabel(
+                "<html><center>" +
+                        "Вы уверены, что хотите удалить пользователя <b>'" + username + "'</b>?<br><br>" +
+                        "<font color='#e74c3c' size='3'>⚠️ Это действие нельзя отменить!</font>" +
+                        "</center></html>",
+                SwingConstants.CENTER
+        );
+        messageLabel.setFont(new Font("Arial", Font.PLAIN, 14));
+        messageLabel.setForeground(new Color(127, 140, 141));
+        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Панель кнопок
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
+        buttonPanel.setBackground(new Color(255, 255, 255));
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
+
+        // Кнопка Отмена
+        JButton cancelButton = new JButton("Отмена");
+        styleDialogButton(cancelButton, new Color(108, 117, 125));
+
+        // Кнопка Удалить
+        JButton deleteButton = new JButton("Удалить");
+        styleDialogButton(deleteButton, new Color(231, 76, 60));
+
+        cancelButton.addActionListener(e -> {
+            result[0] = false;
+            confirmDialog.dispose();
+        });
+
+        deleteButton.addActionListener(e -> {
+            result[0] = true;
+            confirmDialog.dispose();
+        });
+
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(deleteButton);
+
+        contentPanel.add(iconLabel);
+        contentPanel.add(Box.createVerticalStrut(15));
+        contentPanel.add(titleLabel);
+        contentPanel.add(Box.createVerticalStrut(15));
+        contentPanel.add(messageLabel);
+        contentPanel.add(Box.createVerticalStrut(25));
+        contentPanel.add(buttonPanel);
+
+        confirmDialog.add(contentPanel, BorderLayout.CENTER);
+        confirmDialog.getRootPane().setDefaultButton(cancelButton);
+        confirmDialog.pack();
+        confirmDialog.setLocationRelativeTo(this);
+        confirmDialog.setVisible(true);
+
+        return result[0];
+    }
+
+    // Обновленный диалог подтверждения удаления задачи
+    private boolean showDeleteTaskConfirmation(String username, String taskTitle) {
+        final boolean[] result = {false};
+
+        JDialog confirmDialog = new JDialog(this, "Подтверждение удаления", true);
+        confirmDialog.setSize(500, 350);
+        confirmDialog.setLocationRelativeTo(this);
+        confirmDialog.setResizable(false);
+        confirmDialog.setLayout(new BorderLayout());
+
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(new Color(255, 255, 255));
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(30, 40, 30, 40));
+
+        // Иконка
+        JLabel iconLabel = new JLabel("🗑️", SwingConstants.CENTER);
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
+        iconLabel.setForeground(new Color(231, 76, 60));
+        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Заголовок
+        JLabel titleLabel = new JLabel("Удаление задачи", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
+        titleLabel.setForeground(new Color(44, 62, 80));
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Сообщение
+        JLabel messageLabel = new JLabel(
+                "<html><center>" +
+                        "Вы уверены, что хотите удалить задачу <b>'" + taskTitle + "'</b><br>" +
+                        "у пользователя <b>'" + username + "'</b>?" +
+                        "</center></html>",
+                SwingConstants.CENTER
+        );
+        messageLabel.setFont(new Font("Arial", Font.PLAIN, 14));
+        messageLabel.setForeground(new Color(127, 140, 141));
+        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Панель кнопок
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
+        buttonPanel.setBackground(new Color(255, 255, 255));
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
+
+        // Кнопка Отмена
+        JButton cancelButton = new JButton("Отмена");
+        styleDialogButton(cancelButton, new Color(108, 117, 125));
+
+        // Кнопка Удалить
+        JButton deleteButton = new JButton("Удалить");
+        styleDialogButton(deleteButton, new Color(231, 76, 60));
+
+        cancelButton.addActionListener(e -> {
+            result[0] = false;
+            confirmDialog.dispose();
+        });
+
+        deleteButton.addActionListener(e -> {
+            result[0] = true;
+            confirmDialog.dispose();
+        });
+
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(deleteButton);
+
+        contentPanel.add(iconLabel);
+        contentPanel.add(Box.createVerticalStrut(15));
+        contentPanel.add(titleLabel);
+        contentPanel.add(Box.createVerticalStrut(15));
+        contentPanel.add(messageLabel);
+        contentPanel.add(Box.createVerticalStrut(25));
+        contentPanel.add(buttonPanel);
+
+        confirmDialog.add(contentPanel, BorderLayout.CENTER);
+        confirmDialog.getRootPane().setDefaultButton(cancelButton);
+        confirmDialog.pack();
+        confirmDialog.setLocationRelativeTo(this);
+        confirmDialog.setVisible(true);
+
+        return result[0];
+    }
+
+    // Обновленный метод для диалога загрузки
+    private void showLoadingDialog(String message) {
+        SwingUtilities.invokeLater(() -> {
+            if (loadingDialog != null && loadingDialog.isVisible()) {
+                loadingDialog.dispose();
+            }
+
+            loadingDialog = new JDialog(this, "", true);
+            loadingDialog.setSize(400, 150);
+            loadingDialog.setLocationRelativeTo(this);
+            loadingDialog.setLayout(new BorderLayout());
+            loadingDialog.setResizable(false);
+            loadingDialog.setUndecorated(true);
+
+            JPanel loadingPanel = new JPanel(new BorderLayout());
+            loadingPanel.setBackground(Color.WHITE);
+            loadingPanel.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(new Color(52, 152, 219), 2),
+                    BorderFactory.createEmptyBorder(25, 25, 25, 25)
+            ));
+
+            JLabel loadingLabel = new JLabel(message, SwingConstants.CENTER);
+            loadingLabel.setFont(new Font("Arial", Font.BOLD, 14));
+            loadingLabel.setForeground(new Color(44, 62, 80));
+
+            JProgressBar progressBar = new JProgressBar();
+            progressBar.setIndeterminate(true);
+            progressBar.setBackground(Color.WHITE);
+            progressBar.setForeground(new Color(52, 152, 219));
+            progressBar.setBorder(BorderFactory.createEmptyBorder(5, 0, 0, 0));
+
+            loadingPanel.add(loadingLabel, BorderLayout.CENTER);
+            loadingPanel.add(progressBar, BorderLayout.SOUTH);
+
+            loadingDialog.add(loadingPanel, BorderLayout.CENTER);
+            loadingDialog.pack();
+            loadingDialog.setLocationRelativeTo(this);
+            loadingDialog.setVisible(true);
+        });
+    }
+
+// Обновим методы в управлении пользователями для использования новых диалогов:
+
+    private void deleteSelectedUser(JDialog parentDialog) {
+        JList<String> usersList = findUsersList(parentDialog);
+        if (usersList == null) {
+            showErrorMessage("Не удалось найти список пользователей");
+            return;
+        }
+
+        String selectedUser = usersList.getSelectedValue();
+        if (selectedUser == null || selectedUser.equals("Пользователи не найдены") || selectedUser.startsWith("Ошибка")) {
+            showErrorMessage("Выберите пользователя для удаления");
+            return;
+        }
+
+        boolean confirm = showDeleteUserConfirmation(selectedUser);
+        if (confirm) {
+            performDeleteUser(selectedUser, parentDialog);
+        }
+    }
+
+    private void deleteSelectedTask(JDialog parentDialog) {
+        JList<String> usersList = findUsersList(parentDialog);
+        JTable tasksTable = findTasksTable(parentDialog);
+
+        if (usersList == null || tasksTable == null) {
+            showErrorMessage("Не удалось найти компоненты интерфейса");
+            return;
+        }
+
+        String selectedUser = usersList.getSelectedValue();
+        int selectedTaskRow = tasksTable.getSelectedRow();
+
+        if (selectedUser == null || selectedUser.equals("Пользователи не найдены") || selectedUser.startsWith("Ошибка")) {
+            showErrorMessage("Выберите пользователя");
+            return;
+        }
+
+        if (selectedTaskRow == -1) {
+            showErrorMessage("Выберите задачу для удаления");
+            return;
+        }
+
+        String taskTitle = (String) tasksTable.getValueAt(selectedTaskRow, 0);
+
+        boolean confirm = showDeleteTaskConfirmation(selectedUser, taskTitle);
+        if (confirm) {
+            performDeleteTask(selectedUser, taskTitle, parentDialog);
+        }
+    }
+
+    // Единый стиль для кнопок диалогов
+    private void styleDialogButton(JButton button, Color color) {
+        button.setFont(new Font("Arial", Font.BOLD, 14));
+        button.setForeground(Color.WHITE);
+        button.setBackground(color);
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(color.darker(), 1),
+                BorderFactory.createEmptyBorder(10, 25, 10, 25)
+        ));
+        button.setFocusPainted(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(color.darker());
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(color);
+            }
+        });
+    }
+
+    // Простой и надежный метод выбора даты
+    private void showSimpleDatePicker(JTextField dateField) {
+        JDialog dateDialog = new JDialog(this, "Выбор даты", true);
+        dateDialog.setSize(300, 200);
+        dateDialog.setLocationRelativeTo(this);
+        dateDialog.setLayout(new BorderLayout());
+        dateDialog.setResizable(false);
+
+        JPanel contentPanel = new JPanel(new BorderLayout());
+        contentPanel.setBackground(Color.WHITE);
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        // Панель с выбором даты
+        JPanel datePanel = new JPanel(new GridLayout(3, 2, 10, 10));
+        datePanel.setBackground(Color.WHITE);
+        datePanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 20, 0));
+
+        // Текущая дата для значений по умолчанию
+        java.time.LocalDate currentDate = java.time.LocalDate.now();
+        if (!dateField.getText().isEmpty()) {
+            try {
+                currentDate = java.time.LocalDate.parse(dateField.getText());
+            } catch (Exception e) {
+                // Если не удалось распарсить, используем текущую дату
+            }
+        }
+
+        // Год
+        JLabel yearLabel = new JLabel("Год:");
+        yearLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        JSpinner yearSpinner = new JSpinner(new SpinnerNumberModel(
+                currentDate.getYear(), 2020, 2030, 1
+        ));
+        styleSpinner(yearSpinner);
+
+        // Месяц
+        JLabel monthLabel = new JLabel("Месяц:");
+        monthLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        JSpinner monthSpinner = new JSpinner(new SpinnerNumberModel(
+                currentDate.getMonthValue(), 1, 12, 1
+        ));
+        styleSpinner(monthSpinner);
+
+        // День
+        JLabel dayLabel = new JLabel("День:");
+        dayLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        JSpinner daySpinner = new JSpinner(new SpinnerNumberModel(
+                currentDate.getDayOfMonth(), 1, 31, 1
+        ));
+        styleSpinner(daySpinner);
+
+        datePanel.add(yearLabel);
+        datePanel.add(yearSpinner);
+        datePanel.add(monthLabel);
+        datePanel.add(monthSpinner);
+        datePanel.add(dayLabel);
+        datePanel.add(daySpinner);
+
+        // Панель кнопок
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
+        buttonPanel.setBackground(Color.WHITE);
+
+        JButton okButton = new JButton("Выбрать");
+        JButton cancelButton = new JButton("Отмена");
+
+        styleDialogButton(okButton, new Color(52, 152, 219));
+        styleDialogButton(cancelButton, new Color(108, 117, 125));
+
+        okButton.addActionListener(e -> {
+            try {
+                int year = (Integer) yearSpinner.getValue();
+                int month = (Integer) monthSpinner.getValue();
+                int day = (Integer) daySpinner.getValue();
+
+                java.time.LocalDate selectedDate = java.time.LocalDate.of(year, month, day);
+                dateField.setText(selectedDate.toString());
+                dateDialog.dispose();
+            } catch (Exception ex) {
+                showErrorMessage("Неверная дата: " + ex.getMessage());
+            }
+        });
+
+        cancelButton.addActionListener(e -> dateDialog.dispose());
+
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(okButton);
+
+        contentPanel.add(datePanel, BorderLayout.CENTER);
+        contentPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+        dateDialog.add(contentPanel, BorderLayout.CENTER);
+        dateDialog.setVisible(true);
+    }
+
+    // Стилизация спиннеров
+    private void styleSpinner(JSpinner spinner) {
+        spinner.setFont(new Font("Arial", Font.PLAIN, 12));
+        JComponent editor = spinner.getEditor();
+        if (editor instanceof JSpinner.DefaultEditor) {
+            JTextField textField = ((JSpinner.DefaultEditor) editor).getTextField();
+            textField.setBackground(Color.WHITE);
+            textField.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                    BorderFactory.createEmptyBorder(5, 5, 5, 5)
+            ));
+        }
+    }
+
+    // Проверка формата даты
+    private boolean isValidDateFormat(String date) {
+        try {
+            java.time.LocalDate.parse(date);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // Стиль для кнопок управления
+    private void styleManagementButton(JButton button, Color color) {
+        button.setFont(new Font("Arial", Font.BOLD, 12));
+        button.setForeground(Color.WHITE);
+        button.setBackground(color);
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(color.darker(), 1),
+                BorderFactory.createEmptyBorder(8, 15, 8, 15)
+        ));
+        button.setFocusPainted(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(color.darker());
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(color);
+            }
+        });
+    }
+
+    // Метод для стилизации спиннеров даты
+    private void styleDateSpinner(JSpinner spinner) {
+        spinner.setFont(new Font("Arial", Font.PLAIN, 12));
+        JComponent editor = spinner.getEditor();
+        if (editor instanceof JSpinner.DefaultEditor) {
+            JTextField textField = ((JSpinner.DefaultEditor) editor).getTextField();
+            textField.setBackground(Color.WHITE);
+            textField.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                    BorderFactory.createEmptyBorder(5, 5, 5, 5)
+            ));
+        }
+    }
+
+    private void showEditTaskDialog(Task task, String username, JDialog parentDialog) {
+        JDialog editDialog = new JDialog(parentDialog, "Редактирование задачи", true);
+        editDialog.setSize(700, 800);
+        editDialog.setLocationRelativeTo(parentDialog);
+        editDialog.setLayout(new BorderLayout());
+
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(Color.WHITE);
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+
+        // Заголовок
+        JLabel titleLabel = new JLabel("Редактирование задачи", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 22));
+        titleLabel.setForeground(new Color(44, 62, 80));
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel userLabel = new JLabel("Пользователь: " + username, SwingConstants.CENTER);
+        userLabel.setFont(new Font("Arial", Font.PLAIN, 14));
+        userLabel.setForeground(Color.GRAY);
+        userLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Название задачи как заголовок
+        JLabel taskTitleLabel = new JLabel(task.getTitle(), SwingConstants.CENTER);
+        taskTitleLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        taskTitleLabel.setForeground(new Color(52, 152, 219));
+        taskTitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Статус как надпись (черный цвет)
+        JLabel statusTitleLabel = new JLabel("Статус: " + getStatusDisplayName(task.getStatus()), SwingConstants.CENTER);
+        statusTitleLabel.setFont(new Font("Arial", Font.BOLD, 16));
+        statusTitleLabel.setForeground(Color.BLACK);
+        statusTitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Основная панель с полями - используем GridBagLayout для выравнивания
+        JPanel fieldsPanel = new JPanel(new GridBagLayout());
+        fieldsPanel.setBackground(Color.WHITE);
+        fieldsPanel.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 0, 15, 15);
+
+        // Описание задачи
+        JLabel descLabel = new JLabel("Описание задачи:");
+        descLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        descLabel.setForeground(Color.BLACK);
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.NONE;
+        fieldsPanel.add(descLabel, gbc);
+
+        JTextArea descArea = new JTextArea(task.getDescription() != null ? task.getDescription() : "", 20, 20);
+        descArea.setLineWrap(true);
+        descArea.setWrapStyleWord(true);
+        descArea.setFont(new Font("Arial", Font.PLAIN, 13));
+        JScrollPane descScroll = new JScrollPane(descArea);
+        descScroll.setPreferredSize(new Dimension(400, 250));
+        descScroll.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(220, 220, 220)),
+                BorderFactory.createEmptyBorder(5, 5, 5, 5)
+        ));
+        gbc.gridx = 1;
+        gbc.gridy = 0;
+        gbc.anchor = GridBagConstraints.EAST;
+        gbc.fill = GridBagConstraints.NONE;
+        fieldsPanel.add(descScroll, gbc);
+
+        // Приоритет
+        JLabel priorityLabel = new JLabel("Приоритет:");
+        priorityLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        priorityLabel.setForeground(Color.BLACK);
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.NONE;
+        fieldsPanel.add(priorityLabel, gbc);
+
+        String[] priorityOptions = {"СРОЧНАЯ", "НАДО_ПОТОРОПИТЬСЯ", "МОЖЕТ_ПОДОЖДАТЬ"};
+        JComboBox<String> priorityCombo = new JComboBox<>(priorityOptions);
+        priorityCombo.setSelectedItem(task.getImportance());
+        priorityCombo.setPreferredSize(new Dimension(400, 45));
+        priorityCombo.setFont(new Font("Arial", Font.PLAIN, 13));
+        priorityCombo.setBackground(Color.WHITE);
+        priorityCombo.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                BorderFactory.createEmptyBorder(8, 12, 8, 12)
+        ));
+        gbc.gridx = 1;
+        gbc.gridy = 1;
+        gbc.anchor = GridBagConstraints.EAST;
+        gbc.fill = GridBagConstraints.NONE;
+        fieldsPanel.add(priorityCombo, gbc);
+
+        // Дедлайн
+        JLabel deadlineLabel = new JLabel("Дедлайн:");
+        deadlineLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        deadlineLabel.setForeground(Color.BLACK);
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.NONE;
+        fieldsPanel.add(deadlineLabel, gbc);
+
+        JPanel deadlinePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        deadlinePanel.setBackground(Color.WHITE);
+        deadlinePanel.setPreferredSize(new Dimension(400, 40));
+
+        // Создаем спиннеры для даты
+        String deadline = task.getDeadline() != null ? task.getDeadline().split("T")[0] : "";
+        java.time.LocalDate currentDate;
+
+        if (!deadline.isEmpty()) {
+            try {
+                currentDate = java.time.LocalDate.parse(deadline);
+            } catch (Exception e) {
+                currentDate = java.time.LocalDate.now();
+            }
+        } else {
+            currentDate = java.time.LocalDate.now();
+        }
+
+        // Спиннер для года
+        JSpinner yearSpinner = new JSpinner(new SpinnerNumberModel(
+                currentDate.getYear(), 2020, 2030, 1
+        ));
+        styleDateSpinner(yearSpinner);
+        yearSpinner.setPreferredSize(new Dimension(80, 35));
+
+        // Спиннер для месяца
+        JSpinner monthSpinner = new JSpinner(new SpinnerNumberModel(
+                currentDate.getMonthValue(), 1, 12, 1
+        ));
+        styleDateSpinner(monthSpinner);
+        monthSpinner.setPreferredSize(new Dimension(60, 35));
+
+        // Спиннер для дня
+        JSpinner daySpinner = new JSpinner(new SpinnerNumberModel(
+                currentDate.getDayOfMonth(), 1, 31, 1
+        ));
+        styleDateSpinner(daySpinner);
+        daySpinner.setPreferredSize(new Dimension(60, 35));
+
+        // Метки для спиннеров
+        JLabel yearLabel = new JLabel("год");
+        yearLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        JLabel monthLabel = new JLabel("мес");
+        monthLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        JLabel dayTextLabel = new JLabel("день");
+        dayTextLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+
+        deadlinePanel.add(yearSpinner);
+        deadlinePanel.add(yearLabel);
+        deadlinePanel.add(monthSpinner);
+        deadlinePanel.add(monthLabel);
+        deadlinePanel.add(daySpinner);
+        deadlinePanel.add(dayTextLabel);
+
+        gbc.gridx = 1;
+        gbc.gridy = 2;
+        gbc.anchor = GridBagConstraints.EAST;
+        gbc.fill = GridBagConstraints.NONE;
+        fieldsPanel.add(deadlinePanel, gbc);
+
+        // Кнопки
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
+        buttonPanel.setBackground(Color.WHITE);
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
+
+        JButton saveButton = new JButton("Сохранить изменения");
+        JButton cancelButton = new JButton("Отмена");
+
+        saveButton.setFont(new Font("Arial", Font.BOLD, 14));
+        saveButton.setForeground(Color.WHITE);
+        saveButton.setBackground(new Color(46, 204, 113));
+        saveButton.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(39, 174, 96), 1),
+                BorderFactory.createEmptyBorder(12, 25, 12, 25)
+        ));
+        saveButton.setFocusPainted(false);
+        saveButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        cancelButton.setFont(new Font("Arial", Font.BOLD, 14));
+        cancelButton.setForeground(Color.WHITE);
+        cancelButton.setBackground(new Color(108, 117, 125));
+        cancelButton.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(90, 98, 104), 1),
+                BorderFactory.createEmptyBorder(12, 25, 12, 25)
+        ));
+        cancelButton.setFocusPainted(false);
+        cancelButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        saveButton.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                saveButton.setBackground(new Color(39, 174, 96));
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                saveButton.setBackground(new Color(46, 204, 113));
+            }
+        });
+
+        cancelButton.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                cancelButton.setBackground(new Color(90, 98, 104));
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                cancelButton.setBackground(new Color(108, 117, 125));
+            }
+        });
+
+        saveButton.addActionListener(e -> {
+            if (descArea.getText().trim().isEmpty()) {
+                showErrorMessage("Описание задачи не может быть пустым");
+                return;
+            }
+
+            Task updatedTask = new Task();
+            updatedTask.setTitle(task.getTitle());
+            updatedTask.setDescription(descArea.getText().trim());
+            updatedTask.setStatus(task.getStatus());
+            updatedTask.setImportance((String) priorityCombo.getSelectedItem());
+
+            // Получаем дату из спиннеров
+            int year = (Integer) yearSpinner.getValue();
+            int month = (Integer) monthSpinner.getValue();
+            int day = (Integer) daySpinner.getValue();
+
+            try {
+                java.time.LocalDate selectedDate = java.time.LocalDate.of(year, month, day);
+                updatedTask.setDeadline(selectedDate.toString() + "T00:00:00");
+            } catch (Exception ex) {
+                showErrorMessage("Неверная дата: " + ex.getMessage());
+                return;
+            }
+
+            performUpdateTask(updatedTask, parentDialog);
+            editDialog.dispose();
+        });
+
+        cancelButton.addActionListener(e -> editDialog.dispose());
+
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(saveButton);
+
+        contentPanel.add(titleLabel);
+        contentPanel.add(Box.createVerticalStrut(8));
+        contentPanel.add(userLabel);
+        contentPanel.add(Box.createVerticalStrut(10));
+        contentPanel.add(taskTitleLabel);
+        contentPanel.add(Box.createVerticalStrut(10));
+        contentPanel.add(statusTitleLabel);
+        contentPanel.add(Box.createVerticalStrut(25));
+        contentPanel.add(fieldsPanel);
+        contentPanel.add(Box.createVerticalStrut(20));
+        contentPanel.add(buttonPanel);
+
+        editDialog.add(contentPanel, BorderLayout.CENTER);
+        editDialog.setVisible(true);
+    }
 }
