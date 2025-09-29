@@ -6,6 +6,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
@@ -25,6 +26,13 @@ class UserApplicationFrame extends JFrame {
     private JButton applyFiltersButton;
     private JButton resetFiltersButton;
     private List<Task> originalUserTasks; // сохраняем оригинальный список задач
+    private JComboBox<String> allTasksStatusFilter;
+    private JComboBox<String> allTasksImportanceFilter;
+    private JComboBox<String> allTasksSortFilter;
+    private JButton allTasksApplyFiltersButton;
+    private JButton allTasksResetFiltersButton;
+    private List<Task> originalAllUsersTasks;
+
 
     public UserApplicationFrame(String token, Map<String, Object> userInfo) {
         this.authToken = token;
@@ -225,30 +233,6 @@ class UserApplicationFrame extends JFrame {
         return rightPanel;
     }
 
-    private JPanel loadTasksPanel() {
-        JPanel tasksPanel = new JPanel(new BorderLayout());
-        tasksPanel.setBackground(Color.WHITE);
-        tasksPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-
-        JLabel titleLabel = new JLabel("Мои задачи", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
-        titleLabel.setForeground(new Color(44, 62, 80));
-        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
-
-        JPanel loadingPanel = new JPanel(new BorderLayout());
-        loadingPanel.setBackground(Color.WHITE);
-        JLabel loadingLabel = new JLabel("Загрузка задач...", SwingConstants.CENTER);
-        loadingLabel.setFont(new Font("Arial", Font.ITALIC, 16));
-        loadingLabel.setForeground(Color.GRAY);
-        loadingPanel.add(loadingLabel, BorderLayout.CENTER);
-
-        tasksPanel.add(titleLabel, BorderLayout.NORTH);
-        tasksPanel.add(loadingPanel, BorderLayout.CENTER);
-        loadTasksFromServer(tasksPanel, loadingPanel);
-
-        return tasksPanel;
-    }
-
     private void loadTasksFromServer(JPanel tasksPanel, JPanel loadingPanel) {
         new Thread(() -> {
             try {
@@ -379,95 +363,6 @@ class UserApplicationFrame extends JFrame {
         tasksPanel.add(errorLabel, BorderLayout.CENTER);
     }
 
-    private void showAllUsersTasks() {
-        tasksPanel.removeAll();
-        JPanel newTasksPanel = loadAllUsersTasksPanel();
-        centerPanel.remove(tasksPanel);
-        tasksPanel = newTasksPanel;
-        centerPanel.add(tasksPanel, "alltasks");
-        cardLayout.show(centerPanel, "alltasks");
-        centerPanel.revalidate();
-        centerPanel.repaint();
-    }
-
-    private JPanel loadAllUsersTasksPanel() {
-        JPanel allTasksPanel = new JPanel(new BorderLayout());
-        allTasksPanel.setBackground(Color.WHITE);
-        allTasksPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-
-        JLabel titleLabel = new JLabel("Все задачи пользователей", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
-        titleLabel.setForeground(new Color(44, 62, 80));
-        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
-
-        JPanel loadingPanel = new JPanel(new BorderLayout());
-        loadingPanel.setBackground(Color.WHITE);
-        JLabel loadingLabel = new JLabel("Загрузка всех задач...", SwingConstants.CENTER);
-        loadingLabel.setFont(new Font("Arial", Font.ITALIC, 16));
-        loadingLabel.setForeground(Color.GRAY);
-        loadingPanel.add(loadingLabel, BorderLayout.CENTER);
-
-        allTasksPanel.add(titleLabel, BorderLayout.NORTH);
-        allTasksPanel.add(loadingPanel, BorderLayout.CENTER);
-        loadAllUsersTasksFromServer(allTasksPanel, loadingPanel);
-
-        return allTasksPanel;
-    }
-
-    private void loadAllUsersTasksFromServer(JPanel allTasksPanel, JPanel loadingPanel) {
-        new Thread(() -> {
-            try {
-                List<User> users = getAllUsersWithTasks();
-                SwingUtilities.invokeLater(() -> {
-                    loadingPanel.removeAll();
-                    allTasksPanel.removeAll();
-                    allTasksPanel.setLayout(new BorderLayout());
-
-                    JLabel titleLabel = new JLabel("Все задачи пользователей", SwingConstants.CENTER);
-                    titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
-                    titleLabel.setForeground(new Color(44, 62, 80));
-                    titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 20, 10));
-                    allTasksPanel.add(titleLabel, BorderLayout.NORTH);
-
-                    if (users != null && !users.isEmpty()) {
-                        displayAllUsersTasks(allTasksPanel, users);
-                    } else {
-                        showNoTasksMessage(allTasksPanel);
-                    }
-                    allTasksPanel.revalidate();
-                    allTasksPanel.repaint();
-                });
-            } catch (Exception e) {
-                SwingUtilities.invokeLater(() -> {
-                    showErrorPanel(allTasksPanel, "Ошибка загрузки: " + e.getMessage());
-                    allTasksPanel.revalidate();
-                    allTasksPanel.repaint();
-                });
-            }
-        }).start();
-    }
-
-    private void displayAllUsersTasks(JPanel allTasksPanel, List<User> users) {
-        JPanel contentPanel = new JPanel();
-        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-        contentPanel.setBackground(Color.WHITE);
-
-        contentPanel.add(createTableHeader(true));
-        contentPanel.add(Box.createVerticalStrut(10));
-
-        for (User user : users) {
-            if (user.getTasks() != null) {
-                for (Task task : user.getTasks()) {
-                    addTaskRow(contentPanel, task, true, user.getUsername());
-                }
-            }
-        }
-
-        JScrollPane scrollPane = new JScrollPane(contentPanel);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-        allTasksPanel.add(scrollPane, BorderLayout.CENTER);
-    }
-
     private List<String> splitJsonObjects(String json) {
         List<String> objects = new ArrayList<>();
         int start = -1;
@@ -487,28 +382,6 @@ class UserApplicationFrame extends JFrame {
             }
         }
         return objects;
-    }
-
-    private User parseSingleUser(String userJson) {
-        try {
-            User user = new User();
-            String username = extractValue(userJson, "username");
-            if (username == null) return null;
-
-            user.setUsername(username);
-
-            if (userJson.contains("\"tasks\":")) {
-                int tasksStart = userJson.indexOf("\"tasks\":[") + 9;
-                int tasksEnd = userJson.lastIndexOf("]");
-                if (tasksEnd > tasksStart) {
-                    String tasksArray = userJson.substring(tasksStart, tasksEnd);
-                    user.setTasks(parseTasksArray(tasksArray));
-                }
-            }
-            return user;
-        } catch (Exception e) {
-            return null;
-        }
     }
 
     private List<Comment> parseCommentsArray(String commentsJson) {
@@ -577,15 +450,6 @@ class UserApplicationFrame extends JFrame {
         logoutButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
         logoutButton.addActionListener(e -> showLogoutConfirmationDialog());
         return logoutButton;
-    }
-
-    private void styleLogoutButton(JButton button, Color color) {
-        button.setFont(new Font("Arial", Font.BOLD, 12));
-        button.setForeground(Color.WHITE);
-        button.setBackground(color);
-        button.setBorder(BorderFactory.createEmptyBorder(8, 20, 8, 20));
-        button.setFocusPainted(false);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
     }
 
     private void performLogout() {
@@ -955,31 +819,6 @@ class UserApplicationFrame extends JFrame {
 
         System.out.println("DEBUG: No username found in userInfo, using default");
         return "user";
-    }
-
-    private JPanel createTableHeader(boolean showUsername) {
-        int columns = showUsername ? 7 : 6; // Добавляем колонку для действий
-        JPanel headerPanel = new JPanel(new GridLayout(1, columns, 10, 5));
-        headerPanel.setBackground(new Color(240, 240, 240));
-        headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
-        headerPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
-
-        if (showUsername) {
-            JLabel userHeaderLabel = new JLabel("Пользователь");
-            userHeaderLabel.setFont(new Font("Arial", Font.BOLD, 12));
-            userHeaderLabel.setForeground(new Color(44, 62, 80));
-            headerPanel.add(userHeaderLabel);
-        }
-
-        String[] headers = {"Название задачи", "Статус", "Приоритет", "Дедлайн", "Комментарии", "Действия"};
-        for (String header : headers) {
-            JLabel headerLabel = new JLabel(header);
-            headerLabel.setFont(new Font("Arial", Font.BOLD, 12));
-            headerLabel.setForeground(new Color(44, 62, 80));
-            headerPanel.add(headerLabel);
-        }
-
-        return headerPanel;
     }
 
     private void loadUserTasksForStatistics() {
@@ -1658,83 +1497,6 @@ class UserApplicationFrame extends JFrame {
         }
     }
 
-    private void showMyTasks() {
-        tasksPanel.removeAll();
-
-        // Показываем loading
-        tasksPanel.setLayout(new BorderLayout());
-        JLabel loadingLabel = new JLabel("Загрузка ваших задач...", SwingConstants.CENTER);
-        loadingLabel.setFont(new Font("Arial", Font.ITALIC, 16));
-        loadingLabel.setForeground(Color.GRAY);
-        tasksPanel.add(loadingLabel, BorderLayout.CENTER);
-
-        centerPanel.remove(tasksPanel);
-        centerPanel.add(tasksPanel, "tasks");
-        cardLayout.show(centerPanel, "tasks");
-        centerPanel.revalidate();
-        centerPanel.repaint();
-
-        new Thread(() -> {
-            try {
-                System.out.println("DEBUG: Starting to load user tasks...");
-                User user = getUserWithTasks();
-                SwingUtilities.invokeLater(() -> {
-                    tasksPanel.removeAll();
-                    tasksPanel.setLayout(new BorderLayout());
-
-                    JLabel titleLabel = new JLabel("Мои задачи", SwingConstants.CENTER);
-                    titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
-                    titleLabel.setForeground(new Color(44, 62, 80));
-                    titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
-                    tasksPanel.add(titleLabel, BorderLayout.NORTH);
-
-                    if (user != null && user.getTasks() != null && !user.getTasks().isEmpty()) {
-                        userTasks = user.getTasks();
-                        originalUserTasks = new ArrayList<>(userTasks); // сохраняем оригинальный список
-                        System.out.println("DEBUG: Displaying " + userTasks.size() + " tasks");
-
-                        // Создаем панель с фильтрами
-                        JPanel filtersPanel = createFiltersPanel();
-                        tasksPanel.add(filtersPanel, BorderLayout.NORTH);
-
-                        // Создаем панель для задач с кнопками
-                        JPanel tasksContentPanel = new JPanel();
-                        tasksContentPanel.setLayout(new BoxLayout(tasksContentPanel, BoxLayout.Y_AXIS));
-                        tasksContentPanel.setBackground(Color.WHITE);
-
-                        tasksContentPanel.add(createTableHeader(false));
-                        tasksContentPanel.add(Box.createVerticalStrut(10));
-
-                        for (Task task : userTasks) {
-                            addTaskRow(tasksContentPanel, task, false, null);
-                        }
-
-                        JScrollPane scrollPane = new JScrollPane(tasksContentPanel);
-                        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-                        tasksPanel.add(scrollPane, BorderLayout.CENTER);
-
-                    } else {
-                        System.out.println("DEBUG: No tasks found for user");
-                        showNoTasksMessage(tasksPanel);
-                        userTasks = new ArrayList<>();
-                        originalUserTasks = new ArrayList<>();
-                    }
-
-                    tasksPanel.revalidate();
-                    tasksPanel.repaint();
-                });
-            } catch (Exception e) {
-                System.out.println("DEBUG: Error in showMyTasks: " + e.getMessage());
-                e.printStackTrace();
-                SwingUtilities.invokeLater(() -> {
-                    showErrorPanel(tasksPanel, "Ошибка загрузки задач: " + e.getMessage());
-                    tasksPanel.revalidate();
-                    tasksPanel.repaint();
-                });
-            }
-        }).start();
-    }
-
     private void styleComboBox(JComboBox<String> comboBox) {
         comboBox.setFont(new Font("Arial", Font.PLAIN, 12));
         comboBox.setBackground(Color.WHITE);
@@ -1755,50 +1517,6 @@ class UserApplicationFrame extends JFrame {
             userTasks = new ArrayList<>(originalUserTasks);
             refreshTasksDisplay();
         }
-    }
-
-    private void refreshTasksDisplay() {
-        // Находим компоненты в tasksPanel
-        Component[] components = tasksPanel.getComponents();
-        JScrollPane scrollPane = null;
-
-        for (Component comp : components) {
-            if (comp instanceof JScrollPane) {
-                scrollPane = (JScrollPane) comp;
-                break;
-            }
-        }
-
-        if (scrollPane != null) {
-            tasksPanel.remove(scrollPane);
-        }
-
-        // Создаем обновленную панель задач
-        JPanel tasksContentPanel = new JPanel();
-        tasksContentPanel.setLayout(new BoxLayout(tasksContentPanel, BoxLayout.Y_AXIS));
-        tasksContentPanel.setBackground(Color.WHITE);
-
-        tasksContentPanel.add(createTableHeader(false));
-        tasksContentPanel.add(Box.createVerticalStrut(10));
-
-        if (userTasks != null && !userTasks.isEmpty()) {
-            for (Task task : userTasks) {
-                addTaskRow(tasksContentPanel, task, false, null);
-            }
-        } else {
-            JLabel noTasksLabel = new JLabel("Задачи не найдены по выбранным фильтрам", SwingConstants.CENTER);
-            noTasksLabel.setFont(new Font("Arial", Font.ITALIC, 14));
-            noTasksLabel.setForeground(Color.GRAY);
-            noTasksLabel.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
-            tasksContentPanel.add(noTasksLabel);
-        }
-
-        JScrollPane newScrollPane = new JScrollPane(tasksContentPanel);
-        newScrollPane.setBorder(BorderFactory.createEmptyBorder());
-        tasksPanel.add(newScrollPane, BorderLayout.CENTER);
-
-        tasksPanel.revalidate();
-        tasksPanel.repaint();
     }
 
     private void addTaskRow(JPanel parent, Task task, boolean showUsername, String username) {
@@ -2082,31 +1800,6 @@ class UserApplicationFrame extends JFrame {
         });
     }
 
-    private void showFilterStatusMessage() {
-        int totalTasks = originalUserTasks != null ? originalUserTasks.size() : 0;
-        int filteredTasks = userTasks != null ? userTasks.size() : 0;
-
-        String statusFilterText = (String) statusFilter.getSelectedItem();
-        String importanceFilterText = (String) importanceFilter.getSelectedItem();
-        String sortFilterText = (String) sortFilter.getSelectedItem();
-
-        StringBuilder message = new StringBuilder();
-        message.append("Показано ").append(filteredTasks).append(" из ").append(totalTasks).append(" задач");
-
-        if (!"Все статусы".equals(statusFilterText)) {
-            message.append(" • Статус: ").append(getStatusDisplayName(statusFilterText));
-        }
-        if (!"Все приоритеты".equals(importanceFilterText)) {
-            message.append(" • Приоритет: ").append(getImportanceDisplayName(importanceFilterText));
-        }
-        if (!"Без сортировки".equals(sortFilterText)) {
-            message.append(" • Сортировка: ").append(sortFilterText);
-        }
-
-        // Можно добавить временное сообщение в интерфейсе
-        System.out.println("DEBUG: " + message.toString());
-    }
-
     private void applyFilters() {
         if (originalUserTasks == null || originalUserTasks.isEmpty()) {
             System.out.println("DEBUG: No tasks to filter");
@@ -2178,5 +1871,548 @@ class UserApplicationFrame extends JFrame {
         userTasks = filteredTasks;
         System.out.println("DEBUG: Final task count: " + userTasks.size());
         refreshTasksDisplay();
+    }
+
+    private JPanel loadAllUsersTasksPanel() {
+        JPanel allTasksPanel = new JPanel(new BorderLayout());
+        allTasksPanel.setBackground(Color.WHITE);
+        allTasksPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 20, 20));
+
+        JLabel titleLabel = new JLabel("Задачи других пользователей", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        titleLabel.setForeground(new Color(44, 62, 80));
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+
+        // Создаем панель фильтров для всех задач
+        JPanel filtersPanel = createAllTasksFiltersPanel();
+        allTasksPanel.add(filtersPanel, BorderLayout.NORTH);
+
+        JPanel loadingPanel = new JPanel(new BorderLayout());
+        loadingPanel.setBackground(Color.WHITE);
+        JLabel loadingLabel = new JLabel("Загрузка всех задач...", SwingConstants.CENTER);
+        loadingLabel.setFont(new Font("Arial", Font.ITALIC, 16));
+        loadingLabel.setForeground(Color.GRAY);
+        loadingPanel.add(loadingLabel, BorderLayout.CENTER);
+
+        allTasksPanel.add(titleLabel, BorderLayout.NORTH);
+        allTasksPanel.add(loadingPanel, BorderLayout.CENTER);
+        loadAllUsersTasksFromServer(allTasksPanel, loadingPanel);
+
+        return allTasksPanel;
+    }
+
+    private JPanel createAllTasksFiltersPanel() {
+        JPanel filtersPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 10));
+        filtersPanel.setBackground(new Color(248, 249, 250));
+        filtersPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(220, 220, 220)),
+                BorderFactory.createEmptyBorder(15, 20, 15, 20)
+        ));
+        filtersPanel.setPreferredSize(new Dimension(getWidth(), 80));
+
+        // Фильтр по статусу
+        JLabel statusLabel = new JLabel("Статус:");
+        statusLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        statusLabel.setForeground(new Color(44, 62, 80));
+
+        String[] statusOptions = {"Все статусы", "НЕ_НАЧАТА", "В_РАБОТЕ", "ЗАВЕРШЕНА", "НА_ДОРАБОТКЕ"};
+        allTasksStatusFilter = new JComboBox<>(statusOptions);
+        styleComboBox(allTasksStatusFilter);
+        allTasksStatusFilter.setPreferredSize(new Dimension(140, 30));
+
+        // Фильтр по важности
+        JLabel importanceLabel = new JLabel("Важность:");
+        importanceLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        importanceLabel.setForeground(new Color(44, 62, 80));
+
+        String[] importanceOptions = {"Все приоритеты", "СРОЧНАЯ", "НАДО_ПОТОРОПИТЬСЯ", "МОЖЕТ_ПОДОЖДАТЬ"};
+        allTasksImportanceFilter = new JComboBox<>(importanceOptions);
+        styleComboBox(allTasksImportanceFilter);
+        allTasksImportanceFilter.setPreferredSize(new Dimension(140, 30));
+
+        // Сортировка по дедлайну
+        JLabel sortLabel = new JLabel("Сортировка:");
+        sortLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        sortLabel.setForeground(new Color(44, 62, 80));
+
+        String[] sortOptions = {"Без сортировки", "Дедлайн ↑", "Дедлайн ↓"};
+        allTasksSortFilter = new JComboBox<>(sortOptions);
+        styleComboBox(allTasksSortFilter);
+        allTasksSortFilter.setPreferredSize(new Dimension(150, 30));
+
+        // Кнопки
+        allTasksApplyFiltersButton = new JButton("Применить");
+        allTasksResetFiltersButton = new JButton("Сбросить");
+
+        styleFilterButton(allTasksApplyFiltersButton, new Color(52, 152, 219));
+        styleFilterButton(allTasksResetFiltersButton, new Color(108, 117, 125));
+
+        allTasksApplyFiltersButton.setPreferredSize(new Dimension(100, 30));
+        allTasksResetFiltersButton.setPreferredSize(new Dimension(90, 30));
+
+        allTasksApplyFiltersButton.addActionListener(e -> applyAllTasksFilters());
+        allTasksResetFiltersButton.addActionListener(e -> resetAllTasksFilters());
+
+        // Добавляем компоненты на панель
+        filtersPanel.add(statusLabel);
+        filtersPanel.add(allTasksStatusFilter);
+        filtersPanel.add(Box.createHorizontalStrut(10));
+        filtersPanel.add(importanceLabel);
+        filtersPanel.add(allTasksImportanceFilter);
+        filtersPanel.add(Box.createHorizontalStrut(10));
+        filtersPanel.add(sortLabel);
+        filtersPanel.add(allTasksSortFilter);
+        filtersPanel.add(Box.createHorizontalStrut(20));
+        filtersPanel.add(allTasksApplyFiltersButton);
+        filtersPanel.add(allTasksResetFiltersButton);
+
+        return filtersPanel;
+    }
+
+    private void applyAllTasksFilters() {
+        if (originalAllUsersTasks == null || originalAllUsersTasks.isEmpty()) {
+            System.out.println("DEBUG: No all tasks to filter");
+            return;
+        }
+
+        List<Task> filteredTasks = new ArrayList<>(originalAllUsersTasks);
+        System.out.println("DEBUG: Starting with " + filteredTasks.size() + " all tasks");
+
+        // Фильтрация по статусу
+        String selectedStatus = (String) allTasksStatusFilter.getSelectedItem();
+        if (!"Все статусы".equals(selectedStatus)) {
+            int before = filteredTasks.size();
+            filteredTasks.removeIf(task ->
+                    task.getStatus() == null || !task.getStatus().equals(selectedStatus)
+            );
+            System.out.println("DEBUG: All tasks status filter '" + selectedStatus + "' removed " + (before - filteredTasks.size()) + " tasks");
+        }
+
+        // Фильтрация по важности
+        String selectedImportance = (String) allTasksImportanceFilter.getSelectedItem();
+        if (!"Все приоритеты".equals(selectedImportance)) {
+            int before = filteredTasks.size();
+            filteredTasks.removeIf(task ->
+                    task.getImportance() == null || !task.getImportance().equals(selectedImportance)
+            );
+            System.out.println("DEBUG: All tasks importance filter '" + selectedImportance + "' removed " + (before - filteredTasks.size()) + " tasks");
+        }
+
+        // Сортировка по дедлайну
+        String selectedSort = (String) allTasksSortFilter.getSelectedItem();
+        System.out.println("DEBUG: All tasks selected sort: " + selectedSort);
+
+        if ("Дедлайн ↑".equals(selectedSort)) {
+            System.out.println("DEBUG: Sorting all tasks by deadline ascending");
+            filteredTasks.sort((t1, t2) -> {
+                String deadline1 = t1.getDeadline();
+                String deadline2 = t2.getDeadline();
+
+                if (deadline1 == null && deadline2 == null) return 0;
+                if (deadline1 == null) return 1;
+                if (deadline2 == null) return -1;
+
+                return deadline1.compareTo(deadline2);
+            });
+        } else if ("Дедлайн ↓".equals(selectedSort)) {
+            System.out.println("DEBUG: Sorting all tasks by deadline descending");
+            filteredTasks.sort((t1, t2) -> {
+                String deadline1 = t1.getDeadline();
+                String deadline2 = t2.getDeadline();
+
+                if (deadline1 == null && deadline2 == null) return 0;
+                if (deadline1 == null) return 1;
+                if (deadline2 == null) return -1;
+
+                return deadline2.compareTo(deadline1);
+            });
+        }
+
+        // Обновляем отображаемые задачи
+        refreshAllTasksDisplay(filteredTasks);
+    }
+
+    private void resetAllTasksFilters() {
+        allTasksStatusFilter.setSelectedIndex(0);
+        allTasksImportanceFilter.setSelectedIndex(0);
+        allTasksSortFilter.setSelectedIndex(0);
+
+        if (originalAllUsersTasks != null) {
+            refreshAllTasksDisplay(new ArrayList<>(originalAllUsersTasks));
+        }
+    }
+
+    private void loadAllUsersTasksFromServer(JPanel allTasksPanel, JPanel loadingPanel) {
+        new Thread(() -> {
+            try {
+                List<User> users = getAllUsersWithTasks();
+                SwingUtilities.invokeLater(() -> {
+                    loadingPanel.removeAll();
+                    allTasksPanel.removeAll();
+                    allTasksPanel.setLayout(new BorderLayout());
+
+                    JLabel titleLabel = new JLabel("Задачи других пользователей", SwingConstants.CENTER);
+                    titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+                    titleLabel.setForeground(new Color(44, 62, 80));
+                    titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                    allTasksPanel.add(titleLabel, BorderLayout.NORTH);
+
+                    // Создаем панель фильтров
+                    JPanel filtersPanel = createAllTasksFiltersPanel();
+                    allTasksPanel.add(filtersPanel, BorderLayout.NORTH);
+
+                    if (users != null && !users.isEmpty()) {
+                        // Сохраняем оригинальный список всех задач с информацией о пользователях
+                        originalAllUsersTasks = new ArrayList<>();
+                        Map<Task, String> taskUserMap = new HashMap<>();
+
+                        for (User user : users) {
+                            if (user.getTasks() != null) {
+                                for (Task task : user.getTasks()) {
+                                    originalAllUsersTasks.add(task);
+                                    taskUserMap.put(task, user.getUsername());
+                                }
+                            }
+                        }
+
+                        // Сохраняем карту связей для использования в фильтрации
+                        // Можно сохранить как поле класса: private Map<Task, String> allTasksUserMap;
+
+                        System.out.println("DEBUG: Loaded " + originalAllUsersTasks.size() + " tasks from all users");
+                        displayAllUsersTasksWithFilters(allTasksPanel, users);
+                    } else {
+                        showNoTasksMessage(allTasksPanel);
+                        originalAllUsersTasks = new ArrayList<>();
+                    }
+                    allTasksPanel.revalidate();
+                    allTasksPanel.repaint();
+                });
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    showErrorPanel(allTasksPanel, "Ошибка загрузки: " + e.getMessage());
+                    allTasksPanel.revalidate();
+                    allTasksPanel.repaint();
+                });
+            }
+        }).start();
+    }
+
+    private void showAllUsersTasks() {
+        tasksPanel.removeAll();
+        JPanel newTasksPanel = loadAllUsersTasksPanel();
+        centerPanel.remove(tasksPanel);
+        tasksPanel = newTasksPanel;
+        centerPanel.add(tasksPanel, "alltasks");
+        cardLayout.show(centerPanel, "alltasks");
+        centerPanel.revalidate();
+        centerPanel.repaint();
+    }
+
+    private void refreshAllTasksDisplay(List<Task> tasksToDisplay) {
+        // Находим контейнер всех задач
+        Component[] components = tasksPanel.getComponents();
+        JScrollPane scrollPane = null;
+        JLabel titleLabel = null;
+        JPanel filtersPanel = null;
+
+        for (Component comp : components) {
+            if (comp instanceof JScrollPane) {
+                scrollPane = (JScrollPane) comp;
+            } else if (comp instanceof JLabel && ((JLabel) comp).getText().contains("пользователей")) {
+                titleLabel = (JLabel) comp;
+            } else if (comp instanceof JPanel) {
+                // Проверяем, является ли это панелью фильтров
+                JPanel panel = (JPanel) comp;
+                if (panel.getComponentCount() > 0 && panel.getComponent(0) instanceof JLabel) {
+                    JLabel firstLabel = (JLabel) panel.getComponent(0);
+                    if ("Статус:".equals(firstLabel.getText())) {
+                        filtersPanel = panel;
+                    }
+                }
+            }
+        }
+
+        // Удаляем старую панель с задачами
+        if (scrollPane != null) {
+            tasksPanel.remove(scrollPane);
+        }
+
+        // Создаем обновленную панель задач
+        JPanel tasksContentPanel = new JPanel();
+        tasksContentPanel.setLayout(new BoxLayout(tasksContentPanel, BoxLayout.Y_AXIS));
+        tasksContentPanel.setBackground(Color.WHITE);
+
+        tasksContentPanel.add(createTableHeader(true));
+        tasksContentPanel.add(Box.createVerticalStrut(10));
+
+        if (tasksToDisplay != null && !tasksToDisplay.isEmpty()) {
+            // Для отображения нам нужно знать, к какому пользователю принадлежит каждая задача
+            // Создаем временную структуру для хранения связи задач и пользователей
+            Map<Task, String> taskUserMap = new HashMap<>();
+
+            // Заполняем карту связей задач и пользователей из оригинальных данных
+            // В реальной реализации нужно сохранить эту информацию при первоначальной загрузке
+            for (Task task : tasksToDisplay) {
+                taskUserMap.put(task, "Неизвестный пользователь");
+            }
+
+            // Отображаем задачи
+            for (Task task : tasksToDisplay) {
+                String username = taskUserMap.get(task);
+                addTaskRow(tasksContentPanel, task, true, username);
+            }
+        } else {
+            JLabel noTasksLabel = new JLabel("Задачи не найдены по выбранным фильтрам", SwingConstants.CENTER);
+            noTasksLabel.setFont(new Font("Arial", Font.ITALIC, 14));
+            noTasksLabel.setForeground(Color.GRAY);
+            noTasksLabel.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
+            tasksContentPanel.add(noTasksLabel);
+        }
+
+        // Создаем скролл панель с правильными настройками
+        JScrollPane newScrollPane = new JScrollPane(tasksContentPanel);
+        newScrollPane.setBorder(BorderFactory.createEmptyBorder());
+
+        // Настраиваем скролл панель чтобы избежать горизонтального скролла
+        newScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        newScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+
+        // Устанавливаем предпочтительный размер для скролл панели
+        newScrollPane.setPreferredSize(new Dimension(tasksPanel.getWidth() - 40, tasksPanel.getHeight() - 150));
+
+        // Добавляем компоненты обратно в правильном порядке
+        tasksPanel.removeAll();
+
+        if (titleLabel != null) {
+            tasksPanel.add(titleLabel, BorderLayout.NORTH);
+        }
+
+        // Добавляем панель фильтров (пересоздаем ее)
+        JPanel newFiltersPanel = createAllTasksFiltersPanel();
+        tasksPanel.add(newFiltersPanel, BorderLayout.NORTH);
+
+        tasksPanel.add(newScrollPane, BorderLayout.CENTER);
+
+        tasksPanel.revalidate();
+        tasksPanel.repaint();
+    }
+
+    private void refreshTasksDisplay() {
+        // Находим компоненты в tasksPanel
+        Component[] components = tasksPanel.getComponents();
+        JScrollPane scrollPane = null;
+        JLabel titleLabel = null;
+        JPanel filtersPanel = null;
+
+        for (Component comp : components) {
+            if (comp instanceof JScrollPane) {
+                scrollPane = (JScrollPane) comp;
+            } else if (comp instanceof JLabel && ((JLabel) comp).getText().equals("Мои задачи")) {
+                titleLabel = (JLabel) comp;
+            } else if (comp instanceof JPanel) {
+                // Проверяем, является ли это панелью фильтров
+                JPanel panel = (JPanel) comp;
+                if (panel.getComponentCount() > 0 && panel.getComponent(0) instanceof JLabel) {
+                    JLabel firstLabel = (JLabel) panel.getComponent(0);
+                    if ("Статус:".equals(firstLabel.getText())) {
+                        filtersPanel = panel;
+                    }
+                }
+            }
+        }
+
+        // Удаляем старую панель с задачами
+        if (scrollPane != null) {
+            tasksPanel.remove(scrollPane);
+        }
+
+        // Создаем обновленную панель задач
+        JPanel tasksContentPanel = new JPanel();
+        tasksContentPanel.setLayout(new BoxLayout(tasksContentPanel, BoxLayout.Y_AXIS));
+        tasksContentPanel.setBackground(Color.WHITE);
+
+        tasksContentPanel.add(createTableHeader(false));
+        tasksContentPanel.add(Box.createVerticalStrut(10));
+
+        if (userTasks != null && !userTasks.isEmpty()) {
+            for (Task task : userTasks) {
+                addTaskRow(tasksContentPanel, task, false, null);
+            }
+        } else {
+            JLabel noTasksLabel = new JLabel("Задачи не найдены по выбранным фильтрам", SwingConstants.CENTER);
+            noTasksLabel.setFont(new Font("Arial", Font.ITALIC, 14));
+            noTasksLabel.setForeground(Color.GRAY);
+            noTasksLabel.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
+            tasksContentPanel.add(noTasksLabel);
+        }
+
+        // Создаем скролл панель с правильными настройками
+        JScrollPane newScrollPane = new JScrollPane(tasksContentPanel);
+        newScrollPane.setBorder(BorderFactory.createEmptyBorder());
+
+        // Настраиваем скролл панель чтобы избежать горизонтального скролла
+        newScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        newScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+
+        // Устанавливаем предпочтительный размер для скролл панели
+        newScrollPane.setPreferredSize(new Dimension(tasksPanel.getWidth() - 40, tasksPanel.getHeight() - 150));
+
+        // Добавляем компоненты обратно в правильном порядке
+        tasksPanel.removeAll();
+
+        if (titleLabel != null) {
+            tasksPanel.add(titleLabel, BorderLayout.NORTH);
+        }
+
+        // Добавляем панель фильтров (пересоздаем ее)
+        JPanel newFiltersPanel = createFiltersPanel();
+        tasksPanel.add(newFiltersPanel, BorderLayout.NORTH);
+
+        tasksPanel.add(newScrollPane, BorderLayout.CENTER);
+
+        tasksPanel.revalidate();
+        tasksPanel.repaint();
+    }
+
+    private void displayAllUsersTasksWithFilters(JPanel allTasksPanel, List<User> users) {
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(Color.WHITE);
+
+        contentPanel.add(createTableHeader(true));
+        contentPanel.add(Box.createVerticalStrut(10));
+
+        int totalTasks = 0;
+        for (User user : users) {
+            if (user.getTasks() != null) {
+                System.out.println("DEBUG: Displaying tasks for user: " + user.getUsername() +
+                        " (" + user.getTasks().size() + " tasks)");
+                for (Task task : user.getTasks()) {
+                    addTaskRow(contentPanel, task, true, user.getUsername());
+                    totalTasks++;
+                }
+            }
+        }
+
+        System.out.println("DEBUG: Total tasks displayed: " + totalTasks);
+
+        // Создаем скролл панель с правильными настройками
+        JScrollPane scrollPane = new JScrollPane(contentPanel);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+
+        // Настраиваем скролл панель чтобы избежать горизонтального скролла
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+
+        allTasksPanel.add(scrollPane, BorderLayout.CENTER);
+    }
+
+    private void showMyTasks() {
+        tasksPanel.removeAll();
+
+        // Показываем loading
+        tasksPanel.setLayout(new BorderLayout());
+        JLabel loadingLabel = new JLabel("Загрузка ваших задач...", SwingConstants.CENTER);
+        loadingLabel.setFont(new Font("Arial", Font.ITALIC, 16));
+        loadingLabel.setForeground(Color.GRAY);
+        tasksPanel.add(loadingLabel, BorderLayout.CENTER);
+
+        centerPanel.remove(tasksPanel);
+        centerPanel.add(tasksPanel, "tasks");
+        cardLayout.show(centerPanel, "tasks");
+        centerPanel.revalidate();
+        centerPanel.repaint();
+
+        new Thread(() -> {
+            try {
+                System.out.println("DEBUG: Starting to load user tasks...");
+                User user = getUserWithTasks();
+                SwingUtilities.invokeLater(() -> {
+                    tasksPanel.removeAll();
+                    tasksPanel.setLayout(new BorderLayout());
+
+                    JLabel titleLabel = new JLabel("Мои задачи", SwingConstants.CENTER);
+                    titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+                    titleLabel.setForeground(new Color(44, 62, 80));
+                    titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+                    tasksPanel.add(titleLabel, BorderLayout.NORTH);
+
+                    if (user != null && user.getTasks() != null && !user.getTasks().isEmpty()) {
+                        userTasks = user.getTasks();
+                        originalUserTasks = new ArrayList<>(userTasks); // сохраняем оригинальный список
+                        System.out.println("DEBUG: Displaying " + userTasks.size() + " tasks");
+
+                        // Создаем панель с фильтрами
+                        JPanel filtersPanel = createFiltersPanel();
+                        tasksPanel.add(filtersPanel, BorderLayout.NORTH);
+
+                        // Создаем панель для задач с кнопками
+                        JPanel tasksContentPanel = new JPanel();
+                        tasksContentPanel.setLayout(new BoxLayout(tasksContentPanel, BoxLayout.Y_AXIS));
+                        tasksContentPanel.setBackground(Color.WHITE);
+
+                        tasksContentPanel.add(createTableHeader(false));
+                        tasksContentPanel.add(Box.createVerticalStrut(10));
+
+                        for (Task task : userTasks) {
+                            addTaskRow(tasksContentPanel, task, false, null);
+                        }
+
+                        // Создаем скролл панель с правильными настройками
+                        JScrollPane scrollPane = new JScrollPane(tasksContentPanel);
+                        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+
+                        // Настраиваем скролл панель чтобы избежать горизонтального скролла
+                        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+                        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+
+                        tasksPanel.add(scrollPane, BorderLayout.CENTER);
+
+                    } else {
+                        System.out.println("DEBUG: No tasks found for user");
+                        showNoTasksMessage(tasksPanel);
+                        userTasks = new ArrayList<>();
+                        originalUserTasks = new ArrayList<>();
+                    }
+
+                    tasksPanel.revalidate();
+                    tasksPanel.repaint();
+                });
+            } catch (Exception e) {
+                System.out.println("DEBUG: Error in showMyTasks: " + e.getMessage());
+                e.printStackTrace();
+                SwingUtilities.invokeLater(() -> {
+                    showErrorPanel(tasksPanel, "Ошибка загрузки задач: " + e.getMessage());
+                    tasksPanel.revalidate();
+                    tasksPanel.repaint();
+                });
+            }
+        }).start();
+    }
+
+    private JPanel createTableHeader(boolean showUsername) {
+        int columns = showUsername ? 7 : 6;
+        JPanel headerPanel = new JPanel(new GridLayout(1, columns, 10, 5));
+        headerPanel.setBackground(new Color(240, 240, 240));
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        headerPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+
+        // Устанавливаем предпочтительные размеры для колонок
+        if (showUsername) {
+            JLabel userHeaderLabel = new JLabel("Пользователь");
+            userHeaderLabel.setFont(new Font("Arial", Font.BOLD, 12));
+            userHeaderLabel.setForeground(new Color(44, 62, 80));
+            headerPanel.add(userHeaderLabel);
+        }
+
+        String[] headers = {"Название задачи", "Статус", "Приоритет", "Дедлайн", "Комментарии", "Действия"};
+        for (String header : headers) {
+            JLabel headerLabel = new JLabel(header);
+            headerLabel.setFont(new Font("Arial", Font.BOLD, 12));
+            headerLabel.setForeground(new Color(44, 62, 80));
+            headerPanel.add(headerLabel);
+        }
+
+        return headerPanel;
     }
 }
