@@ -460,27 +460,61 @@ public class LoginFrame extends JFrame {
         return null;
     }
 
-    // В классе LoginFrame исправляем метод parseUserInfo
     private Map<String, Object> parseUserInfo(String jsonResponse) {
         try {
             Map<String, Object> userInfo = new HashMap<>();
+            System.out.println("DEBUG: Parsing user info from: " + jsonResponse);
 
-            // Извлекаем username
+            // Простой и надежный способ извлечения username
             if (jsonResponse.contains("\"username\"")) {
-                int usernameStart = jsonResponse.indexOf("\"username\":\"") + 11;
-                int usernameEnd = jsonResponse.indexOf("\"", usernameStart);
-                if (usernameStart > 10 && usernameEnd > usernameStart) {
-                    userInfo.put("username", jsonResponse.substring(usernameStart, usernameEnd));
+                // Ищем начало username
+                int usernameIndex = jsonResponse.indexOf("\"username\"");
+                if (usernameIndex != -1) {
+                    // Ищем двоеточие после username
+                    int colonIndex = jsonResponse.indexOf(":", usernameIndex);
+                    if (colonIndex != -1) {
+                        // Ищем начало значения (может быть в кавычках или без)
+                        int valueStart = colonIndex + 1;
+                        // Пропускаем пробелы
+                        while (valueStart < jsonResponse.length() && Character.isWhitespace(jsonResponse.charAt(valueStart))) {
+                            valueStart++;
+                        }
+
+                        if (valueStart < jsonResponse.length()) {
+                            if (jsonResponse.charAt(valueStart) == '"') {
+                                // Значение в кавычках
+                                valueStart++; // Пропускаем открывающую кавычку
+                                int valueEnd = jsonResponse.indexOf("\"", valueStart);
+                                if (valueEnd != -1) {
+                                    String username = jsonResponse.substring(valueStart, valueEnd);
+                                    userInfo.put("username", username);
+                                    System.out.println("DEBUG: Extracted username: " + username);
+                                }
+                            } else {
+                                // Значение без кавычек
+                                int valueEnd = jsonResponse.indexOf(",", valueStart);
+                                if (valueEnd == -1) valueEnd = jsonResponse.indexOf("}", valueStart);
+                                if (valueEnd != -1) {
+                                    String username = jsonResponse.substring(valueStart, valueEnd).trim();
+                                    userInfo.put("username", username);
+                                    System.out.println("DEBUG: Extracted username: " + username);
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
-            // Извлекаем role - исправленный вариант
+            // Извлекаем role
             String role = extractRoleFromJson(jsonResponse);
             userInfo.put("role", role);
+            System.out.println("DEBUG: Extracted role: " + role);
 
+            System.out.println("DEBUG: Final userInfo: " + userInfo);
             return userInfo;
         } catch (Exception e) {
             System.err.println("Ошибка парсинга информации о пользователе: " + e.getMessage());
+            e.printStackTrace();
         }
         return null;
     }
