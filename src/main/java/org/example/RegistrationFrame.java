@@ -4,6 +4,9 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.geom.RoundRectangle2D;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -19,6 +22,9 @@ public class RegistrationFrame extends JFrame {
     private JPasswordField confirmPasswordField;
     private JButton registerButton;
     private JLabel statusLabel;
+    private JLabel closeLabel;
+    private JLabel minimizeLabel;
+    private JPanel headerPanel;
 
     // URL вашего сервера для регистрации
     private static final String REGISTER_URL = "http://localhost:8080/register";
@@ -26,116 +32,448 @@ public class RegistrationFrame extends JFrame {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
+    // Переменные для перетаскивания окна
+    private int dragX, dragY;
+
     public RegistrationFrame() {
+        setUndecorated(true);
         setTitle("Регистрация");
-        setSize(500, 650);
+        setSize(1000, 700);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
         setResizable(false);
+        setShape(new RoundRectangle2D.Double(0, 0, 1000, 700, 40, 40));
 
+        // Жестко фиксируем размер и позицию
+        setMinimumSize(new Dimension(1000, 700));
+        setMaximumSize(new Dimension(1000, 700));
+
+        // Создаем стек для слоев
+        JLayeredPane layeredPane = new JLayeredPane();
+        layeredPane.setLayout(new OverlayLayout(layeredPane));
+
+        // Фоновый градиент
+        BackgroundPanel backgroundPanel = new BackgroundPanel();
+        backgroundPanel.setBounds(0, 0, 1000, 700);
+
+        // Основной контент
         contentPane = new JPanel();
         contentPane.setLayout(new BoxLayout(contentPane, BoxLayout.Y_AXIS));
-        contentPane.setBackground(new Color(245, 245, 245));
-        contentPane.setBorder(BorderFactory.createEmptyBorder(40, 50, 40, 50));
+        contentPane.setOpaque(false);
+        contentPane.setBorder(BorderFactory.createEmptyBorder(15, 50, 40, 50));
 
-        // Заголовок
-        JLabel titleLabel = new JLabel("Регистрация");
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 28));
-        titleLabel.setForeground(new Color(44, 62, 80));
+        // Заголовок окна с кнопками закрытия
+        headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setOpaque(false);
+        headerPanel.setMaximumSize(new Dimension(1000, 45));
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(5, 0, 0, 0));
+
+        JPanel controlsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 5));
+        controlsPanel.setOpaque(false);
+        controlsPanel.setPreferredSize(new Dimension(80, 35));
+
+        minimizeLabel = createControlLabel("−", new Color(155, 89, 182));
+        closeLabel = createControlLabel("×", new Color(231, 76, 60));
+
+        controlsPanel.add(minimizeLabel);
+        controlsPanel.add(closeLabel);
+
+        headerPanel.add(controlsPanel, BorderLayout.EAST);
+
+        // Центральная панель с формой
+        JPanel centerPanel = new JPanel();
+        centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
+        centerPanel.setOpaque(false);
+        centerPanel.setMaximumSize(new Dimension(400, 600));
+
+        // Заголовок формы
+        JLabel titleLabel = new JLabel("Создать аккаунт");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 32));
+        titleLabel.setForeground(Color.WHITE);
         titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        titleLabel.setHorizontalAlignment(JLabel.CENTER);
 
-        // Поле для логина
-        JPanel usernamePanel = createInputPanel("Логин:");
-        usernameField = new JTextField(15);
-        styleTextField(usernameField);
+        // Подзаголовок
+        JLabel subtitleLabel = new JLabel("Заполните данные для регистрации");
+        subtitleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        subtitleLabel.setForeground(new Color(200, 200, 200));
+        subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        subtitleLabel.setHorizontalAlignment(JLabel.CENTER);
+
+        // Панель для формы с неоморфным эффектом
+        JPanel formPanel = createNeomorphicPanel();
+        formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
+        formPanel.setMaximumSize(new Dimension(400, 500));
+
+        // Иконка регистрации
+        JLabel userIcon = new JLabel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                // Фиолетовый градиент для иконки
+                GradientPaint gradient = new GradientPaint(0, 0, new Color(155, 89, 182),
+                        0, getHeight(), new Color(142, 68, 173));
+                g2.setPaint(gradient);
+                g2.fillOval(0, 0, getWidth(), getHeight());
+
+                g2.setFont(new Font("Segoe UI", Font.BOLD, 24));
+                g2.setColor(Color.WHITE);
+                FontMetrics fm = g2.getFontMetrics();
+                String icon = "👤";
+                int x = (getWidth() - fm.stringWidth(icon)) / 2;
+                int y = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
+                g2.drawString(icon, x, y);
+                g2.dispose();
+            }
+        };
+        userIcon.setPreferredSize(new Dimension(80, 80));
+        userIcon.setAlignmentX(Component.CENTER_ALIGNMENT);
+        userIcon.setMaximumSize(new Dimension(80, 80));
+
+        // Поля ввода
+        JPanel usernamePanel = createInputPanel("Логин");
+        usernameField = createStyledTextField();
         usernamePanel.add(usernameField);
 
-        // Поле для пароля
-        JPanel passwordPanel = createInputPanel("Пароль:");
-        passwordField = new JPasswordField(15);
-        styleTextField(passwordField);
+        JPanel passwordPanel = createInputPanel("Пароль");
+        passwordField = createStyledPasswordField();
         passwordPanel.add(passwordField);
 
-        // Поле для подтверждения пароля
-        JPanel confirmPasswordPanel = createInputPanel("Повторите пароль:");
-        confirmPasswordField = new JPasswordField(15);
-        styleTextField(confirmPasswordField);
+        JPanel confirmPasswordPanel = createInputPanel("Повторите пароль");
+        confirmPasswordField = createStyledPasswordField();
         confirmPasswordPanel.add(confirmPasswordField);
 
         // Кнопка регистрации
-        registerButton = new JButton("Зарегистрироваться");
-        styleRegisterButton(registerButton);
+        registerButton = new JButton("Создать аккаунт") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                // Фиолетовый градиент
+                GradientPaint gradient = new GradientPaint(0, 0, new Color(155, 89, 182),
+                        0, getHeight(), new Color(142, 68, 173));
+                g2.setPaint(gradient);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 25, 25);
+
+                g2.setColor(Color.WHITE);
+                g2.setFont(getFont());
+                FontMetrics fm = g2.getFontMetrics();
+                String text = getText();
+                int x = (getWidth() - fm.stringWidth(text)) / 2;
+                int y = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
+                g2.drawString(text, x, y);
+                g2.dispose();
+            }
+        };
+        styleModernRegisterButton(registerButton);
         registerButton.addActionListener(new RegisterButtonListener());
 
+        JPanel loginPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        loginPanel.setOpaque(false);
+        loginPanel.setMaximumSize(new Dimension(350, 30));
+
+        JLabel questionLabel = new JLabel("Уже есть аккаунт? ");
+        questionLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        questionLabel.setForeground(Color.WHITE);
+        questionLabel.setOpaque(false);
+
+        JLabel loginLabel = createClickableLoginLabel();
+
+        loginPanel.add(questionLabel);
+        loginPanel.add(loginLabel);
+
         // Статусная строка
-        statusLabel = new JLabel("Заполните все поля");
-        statusLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-        statusLabel.setForeground(new Color(127, 140, 141));
+        statusLabel = new JLabel(" ");
+        statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        statusLabel.setForeground(new Color(255, 255, 255, 180));
         statusLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        statusLabel.setOpaque(false);
 
-        // Добавление компонентов
-        contentPane.add(Box.createVerticalStrut(20));
-        contentPane.add(titleLabel);
-        contentPane.add(Box.createVerticalStrut(20));
-        contentPane.add(usernamePanel);
-        contentPane.add(Box.createVerticalStrut(20));
-        contentPane.add(passwordPanel);
-        contentPane.add(Box.createVerticalStrut(20));
-        contentPane.add(confirmPasswordPanel);
-        contentPane.add(Box.createVerticalStrut(30));
-        contentPane.add(registerButton);
-        contentPane.add(Box.createVerticalStrut(10));
-        contentPane.add(statusLabel);
+        // Сборка формы
+        formPanel.add(Box.createVerticalStrut(20));
+        formPanel.add(userIcon);
+        formPanel.add(Box.createVerticalStrut(30));
+        formPanel.add(usernamePanel);
+        formPanel.add(Box.createVerticalStrut(15));
+        formPanel.add(passwordPanel);
+        formPanel.add(Box.createVerticalStrut(15));
+        formPanel.add(confirmPasswordPanel);
+        formPanel.add(Box.createVerticalStrut(30));
+        formPanel.add(registerButton);
+        formPanel.add(Box.createVerticalStrut(20));
+        formPanel.add(statusLabel);
+        formPanel.add(Box.createVerticalStrut(15));
+        formPanel.add(loginPanel);
 
-        add(contentPane);
+        // Сборка центральной панели
+        centerPanel.add(Box.createVerticalStrut(20));
+        centerPanel.add(titleLabel);
+        centerPanel.add(Box.createVerticalStrut(5));
+        centerPanel.add(subtitleLabel);
+        centerPanel.add(Box.createVerticalStrut(40));
+        centerPanel.add(formPanel);
+
+        // Сборка основного контента
+        contentPane.add(headerPanel);
+        contentPane.add(centerPanel);
+
+        // Добавляем все в слои
+        layeredPane.add(backgroundPanel, Integer.valueOf(0));
+        layeredPane.add(contentPane, Integer.valueOf(1));
+
+        setContentPane(layeredPane);
+
+        // Добавляем возможность перетаскивания окна
+        addMouseListeners();
+
+        // Анимация появления
+        setOpacity(0f);
+        Timer fadeIn = new Timer(10, new ActionListener() {
+            float opacity = 0f;
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                opacity += 0.05f;
+                if (opacity >= 1f) {
+                    opacity = 1f;
+                    ((Timer)e.getSource()).stop();
+                }
+                setOpacity(opacity);
+            }
+        });
+        fadeIn.start();
     }
 
+    // Кастомная панель с ЧЕРНО-ФИОЛЕТОВЫМ градиентом
+    private class BackgroundPanel extends JPanel {
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            // Черно-фиолетовый градиент
+            GradientPaint mainGradient = new GradientPaint(0, 0, new Color(25, 25, 35),
+                    getWidth(), getHeight(), new Color(45, 30, 60));
+            g2.setPaint(mainGradient);
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), 40, 40);
+
+            // Декоративные элементы
+            drawBubbles(g2);
+        }
+
+        private void drawBubbles(Graphics2D g2) {
+            // Фиолетовые пузырьки на заднем плане
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.08f));
+            g2.setColor(new Color(155, 89, 182));
+
+            // Большой пузырь
+            g2.fillOval(-50, -50, 200, 200);
+            g2.fillOval(getWidth() - 100, getHeight() - 150, 300, 300);
+            g2.fillOval(getWidth() - 250, 50, 150, 150);
+
+            // Дополнительные мелкие пузырьки
+            g2.fillOval(100, getHeight() - 200, 100, 100);
+            g2.fillOval(getWidth() - 150, 200, 80, 80);
+
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+        }
+    }
+
+    private JPanel createNeomorphicPanel() {
+        return new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                // Темный неоморфный эффект
+                Color background = new Color(255, 255, 255, 10);
+                g2.setColor(background);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 25, 25);
+
+                // Бордер с фиолетовым оттенком
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.setColor(new Color(155, 89, 182, 80));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 25, 25);
+            }
+        };
+    }
+
+    // Метод для создания полей ввода
     private JPanel createInputPanel(String labelText) {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
-        panel.setBackground(new Color(245, 245, 245));
-        panel.setMaximumSize(new Dimension(400, 50));
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout(15, 0));
+        panel.setOpaque(false);
+        panel.setMaximumSize(new Dimension(350, 70));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
 
+        // Метка
         JLabel label = new JLabel(labelText);
-        label.setFont(new Font("Arial", Font.BOLD, 14));
-        label.setForeground(new Color(44, 62, 80));
-        label.setPreferredSize(new Dimension(150, 30));
+        label.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        label.setForeground(Color.WHITE);
+        label.setPreferredSize(new Dimension(140, 30));
 
-        panel.add(label);
+        panel.add(label, BorderLayout.WEST);
         return panel;
     }
 
-    private void styleTextField(JTextField textField) {
-        textField.setPreferredSize(new Dimension(200, 40));
-        textField.setFont(new Font("Arial", Font.PLAIN, 14));
-        textField.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(189, 195, 199), 1),
-                BorderFactory.createEmptyBorder(10, 10, 10, 10)
-        ));
-        textField.setBackground(Color.WHITE);
+    // Стилизованное текстовое поле
+    private JTextField createStyledTextField() {
+        JTextField field = new JTextField() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                g2.setColor(new Color(155, 89, 182, 120));
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 15, 15);
+                g2.dispose();
+            }
+        };
+
+        field.setPreferredSize(new Dimension(250, 45));
+        field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        field.setForeground(Color.WHITE);
+        field.setCaretColor(new Color(155, 89, 182));
+        field.setBackground(new Color(40, 40, 50));
+        field.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        field.setOpaque(true);
+
+        return field;
     }
 
-    private void styleRegisterButton(JButton button) {
-        button.setPreferredSize(new Dimension(220, 45));
+    // Стилизованное поле пароля
+    private JPasswordField createStyledPasswordField() {
+        JPasswordField field = new JPasswordField() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                g2.setColor(new Color(155, 89, 182, 120));
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 15, 15);
+                g2.dispose();
+            }
+        };
+
+        field.setPreferredSize(new Dimension(250, 45));
+        field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        field.setForeground(Color.WHITE);
+        field.setCaretColor(new Color(155, 89, 182));
+        field.setBackground(new Color(40, 40, 50));
+        field.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        field.setOpaque(true);
+
+        return field;
+    }
+
+    private JLabel createControlLabel(String text, Color color) {
+        JLabel label = new JLabel(text) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                g2.setColor(color);
+                g2.fillOval(2, 2, getWidth()-4, getHeight()-4);
+
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Segoe UI", Font.BOLD, 16));
+                FontMetrics fm = g2.getFontMetrics();
+                int x = (getWidth() - fm.stringWidth(getText())) / 2;
+                int y = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
+                g2.drawString(getText(), x, y);
+            }
+        };
+        label.setPreferredSize(new Dimension(28, 28));
+        label.setMinimumSize(new Dimension(28, 28));
+        label.setMaximumSize(new Dimension(28, 28));
+        label.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        label.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (label == closeLabel) {
+                    disposeWithAnimation();
+                } else if (label == minimizeLabel) {
+                    setState(Frame.ICONIFIED);
+                }
+            }
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                label.repaint();
+            }
+        });
+
+        return label;
+    }
+
+    private void styleModernRegisterButton(JButton button) {
+        button.setPreferredSize(new Dimension(320, 50));
         button.setAlignmentX(Component.CENTER_ALIGNMENT);
-        button.setFont(new Font("Arial", Font.BOLD, 16));
+        button.setFont(new Font("Segoe UI", Font.BOLD, 16));
         button.setForeground(Color.WHITE);
-        button.setBackground(new Color(46, 204, 113));
-        button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        button.setBorder(BorderFactory.createEmptyBorder());
+        button.setContentAreaFilled(false);
         button.setFocusPainted(false);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
-        button.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseEntered(java.awt.event.MouseEvent evt) {
-                button.setBackground(new Color(39, 174, 96));
+        button.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent evt) {
+                button.repaint();
             }
 
-            public void mouseExited(java.awt.event.MouseEvent evt) {
-                button.setBackground(new Color(46, 204, 113));
+            public void mouseExited(MouseEvent evt) {
+                button.repaint();
             }
         });
     }
 
-    // Обработчик кнопки регистрации с HTTP запросом
+    private void addMouseListeners() {
+        headerPanel.addMouseListener(new MouseAdapter() {
+            public void mousePressed(MouseEvent e) {
+                dragX = e.getX();
+                dragY = e.getY();
+            }
+        });
+
+        headerPanel.addMouseMotionListener(new MouseAdapter() {
+            public void mouseDragged(MouseEvent e) {
+                int x = e.getXOnScreen();
+                int y = e.getYOnScreen();
+                setLocation(x - dragX, y - dragY);
+            }
+        });
+    }
+
+    private void disposeWithAnimation() {
+        Timer fadeOut = new Timer(10, new ActionListener() {
+            float opacity = 1f;
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                opacity -= 0.05f;
+                if (opacity <= 0f) {
+                    opacity = 0f;
+                    ((Timer)e.getSource()).stop();
+                    dispose();
+                }
+                setOpacity(opacity);
+            }
+        });
+        fadeOut.start();
+    }
+
+    // Обработчик кнопки регистрации
     private class RegisterButtonListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
@@ -143,61 +481,61 @@ public class RegistrationFrame extends JFrame {
             String password = new String(passwordField.getPassword()).trim();
             String confirmPassword = new String(confirmPasswordField.getPassword()).trim();
 
-            // Валидация на клиенте
             if (!validateInput(username, password, confirmPassword)) {
                 return;
             }
 
-            // Отключаем кнопку на время запроса
             registerButton.setEnabled(false);
-            showStatus("Отправка запроса на сервер...", Color.ORANGE);
+            showStatus("Отправка запроса на сервер...", new Color(155, 89, 182));
 
-            // Запускаем HTTP запрос в отдельном потоке
+            startLoadingAnimation();
+
             new Thread(() -> {
                 try {
-                    // Отправляем запрос на сервер
                     String response = sendRegistrationRequest(username, password);
-
-                    // Обрабатываем ответ в EDT
                     SwingUtilities.invokeLater(() -> {
+                        stopLoadingAnimation();
                         handleServerResponse(response, username);
                     });
-
                 } catch (Exception ex) {
                     SwingUtilities.invokeLater(() -> {
-                        showStatus("Ошибка соединения: " + ex.getMessage(), Color.RED);
+                        stopLoadingAnimation();
+                        showStatus("Ошибка соединения: " + ex.getMessage(), new Color(231, 76, 60));
                         registerButton.setEnabled(true);
+                        shakeAnimation();
                     });
                 }
             }).start();
         }
 
-        // Валидация данных на клиенте
         private boolean validateInput(String username, String password, String confirmPassword) {
             if (username.isEmpty() || password.isEmpty() || confirmPassword.isEmpty()) {
-                showStatus("Заполните все поля!", Color.RED);
+                showStatus("Заполните все поля!", new Color(231, 76, 60));
+                shakeAnimation();
                 return false;
             }
 
             if (username.length() < 3) {
-                showStatus("Логин должен быть не менее 3 символов!", Color.RED);
+                showStatus("Логин должен быть не менее 3 символов!", new Color(231, 76, 60));
+                shakeAnimation();
                 return false;
             }
 
             if (password.length() < 6) {
-                showStatus("Пароль должен быть не менее 6 символов!", Color.RED);
+                showStatus("Пароль должен быть не менее 6 символов!", new Color(231, 76, 60));
+                shakeAnimation();
                 return false;
             }
 
             if (!password.equals(confirmPassword)) {
-                showStatus("Пароли не совпадают!", Color.RED);
+                showStatus("Пароли не совпадают!", new Color(231, 76, 60));
+                shakeAnimation();
                 return false;
             }
 
             return true;
         }
 
-        // Отправка HTTP запроса на сервер для регистрации
         private String sendRegistrationRequest(String username, String password)
                 throws IOException, InterruptedException {
 
@@ -218,7 +556,6 @@ public class RegistrationFrame extends JFrame {
             return response.body();
         }
 
-        // Обработка ответа от сервера
         private void handleServerResponse(String response, String username) {
             registerButton.setEnabled(true);
 
@@ -227,180 +564,288 @@ public class RegistrationFrame extends JFrame {
                         response.contains("success") ||
                         response.contains("200")) {
 
-                    showStatus("Регистрация успешна!", new Color(46, 204, 113));
-
-                    // Используем красивое кастомное окно вместо JOptionPane
+                    // УБРАЛ показ статуса "Регистрация успешна!" под кнопкой
+                    // Просто показываем диалог
                     showSuccessDialog(username);
-
-                    // Закрываем окно регистрации
-                    dispose();
 
                 } else if (response.contains("username") && response.contains("already")) {
-                    showStatus("Логин уже занят", Color.RED);
+                    showStatus("Логин уже занят", new Color(231, 76, 60));
                     showErrorDialog("Пользователь с таким логином уже существует!", "Ошибка регистрации");
+                    shakeAnimation();
 
                 } else if (response.contains("error") || response.contains("400") || response.contains("409")) {
-                    showStatus("Ошибка регистрации", Color.RED);
+                    showStatus("Ошибка регистрации", new Color(231, 76, 60));
                     showErrorDialog("Ошибка при регистрации: " + response, "Ошибка сервера");
+                    shakeAnimation();
                 } else {
-                    showStatus("Регистрация завершена", new Color(46, 204, 113));
+                    // УБРАЛ показ статуса "Регистрация завершена" под кнопкой
+                    // Просто показываем диалог
                     showSuccessDialog(username);
-                    dispose();
                 }
             } catch (Exception ex) {
-                showStatus("Ошибка обработки ответа", Color.RED);
+                showStatus("Ошибка обработки ответа", new Color(231, 76, 60));
                 showErrorDialog("Ошибка: " + ex.getMessage(), "Ошибка");
+                shakeAnimation();
             }
         }
     }
 
-    // Красивое окно успешной регистрации
-    private void showSuccessDialog(String username) {
-        // Создаем кастомное диалоговое окно
-        JDialog successDialog = new JDialog(this, "Успешная регистрация", true);
-        successDialog.setSize(400, 300);
-        successDialog.setLocationRelativeTo(this);
-        successDialog.setResizable(false);
-        successDialog.setLayout(new BorderLayout());
-
-        // Панель содержимого
-        JPanel contentPanel = new JPanel();
-        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-        contentPanel.setBackground(new Color(255, 255, 255));
-        contentPanel.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
-
-        // Иконка успеха (зеленая галочка)
-        JLabel iconLabel = new JLabel("✓", SwingConstants.CENTER);
-        iconLabel.setFont(new Font("Arial", Font.BOLD, 64));
-        iconLabel.setForeground(new Color(46, 204, 113));
-        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        // Заголовок
-        JLabel titleLabel = new JLabel("Регистрация завершена!", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
-        titleLabel.setForeground(new Color(44, 62, 80));
-        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        // Сообщение
-        JLabel messageLabel = new JLabel("<html><center>Пользователь <b>" + username + "</b><br>успешно зарегистрирован!</center></html>", SwingConstants.CENTER);
-        messageLabel.setFont(new Font("Arial", Font.PLAIN, 14));
-        messageLabel.setForeground(new Color(127, 140, 141));
-        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        // Дополнительное сообщение
-        JLabel infoLabel = new JLabel("Теперь вы можете войти в систему", SwingConstants.CENTER);
-        infoLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-        infoLabel.setForeground(new Color(169, 181, 183));
-        infoLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        // Кнопка OK
-        JButton okButton = new JButton("Отлично!");
-        okButton.setFont(new Font("Arial", Font.BOLD, 14));
-        okButton.setForeground(Color.WHITE);
-        okButton.setBackground(new Color(46, 204, 113));
-        okButton.setBorder(BorderFactory.createEmptyBorder(10, 30, 10, 30));
-        okButton.setFocusPainted(false);
-        okButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        okButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        okButton.addActionListener(e -> successDialog.dispose());
-
-        okButton.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseEntered(java.awt.event.MouseEvent evt) {
-                okButton.setBackground(new Color(39, 174, 96));
-            }
-            public void mouseExited(java.awt.event.MouseEvent evt) {
-                okButton.setBackground(new Color(46, 204, 113));
+    // Анимации
+    private void shakeAnimation() {
+        // Упрощенная анимация без смещения contentPane
+        Timer shakeTimer = new Timer(20, new ActionListener() {
+            int count = 0;
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (count < 8) {
+                    // Просто меняем цвет статуса для эффекта
+                    statusLabel.setForeground(count % 2 == 0 ? new Color(231, 76, 60) : new Color(255, 150, 150));
+                    count++;
+                } else {
+                    statusLabel.setForeground(new Color(231, 76, 60));
+                    ((Timer)e.getSource()).stop();
+                }
             }
         });
-
-        // Добавляем компоненты
-        contentPanel.add(iconLabel);
-        contentPanel.add(Box.createVerticalStrut(10));
-        contentPanel.add(titleLabel);
-        contentPanel.add(Box.createVerticalStrut(10));
-        contentPanel.add(messageLabel);
-        contentPanel.add(Box.createVerticalStrut(5));
-        contentPanel.add(infoLabel);
-        contentPanel.add(Box.createVerticalStrut(20));
-        contentPanel.add(okButton);
-
-        successDialog.add(contentPanel, BorderLayout.CENTER);
-        successDialog.getRootPane().setDefaultButton(okButton);
-
-        // Центрируем и показываем
-        successDialog.pack();
-        successDialog.setLocationRelativeTo(this);
-        successDialog.setVisible(true);
+        shakeTimer.start();
     }
 
     // Красивое окно ошибки
     private void showErrorDialog(String message, String title) {
-        JDialog errorDialog = new JDialog(this, title, true);
-        errorDialog.setSize(400, 250);
+        JDialog errorDialog = new JDialog(this, "", true);
+        errorDialog.setUndecorated(true);
+        errorDialog.setSize(400, 300);
         errorDialog.setLocationRelativeTo(this);
         errorDialog.setResizable(false);
-        errorDialog.setLayout(new BorderLayout());
+        errorDialog.setShape(new RoundRectangle2D.Double(0, 0, 400, 300, 25, 25));
 
         JPanel contentPanel = new JPanel();
         contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-        contentPanel.setBackground(new Color(255, 255, 255));
+        contentPanel.setBackground(new Color(30, 30, 40));
         contentPanel.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
 
-        // Иконка ошибки (красный крестик)
-        JLabel iconLabel = new JLabel("✗", SwingConstants.CENTER);
-        iconLabel.setFont(new Font("Arial", Font.BOLD, 48));
-        iconLabel.setForeground(new Color(220, 53, 69));
+        JLabel iconLabel = new JLabel("✗") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                g2.setColor(new Color(231, 76, 60));
+                g2.fillOval(0, 0, getWidth(), getHeight());
+
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Segoe UI", Font.BOLD, 36));
+                FontMetrics fm = g2.getFontMetrics();
+                int x = (getWidth() - fm.stringWidth("✗")) / 2;
+                int y = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
+                g2.drawString("✗", x, y);
+                g2.dispose();
+            }
+        };
+        iconLabel.setPreferredSize(new Dimension(80, 80));
         iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel titleLabel = new JLabel(title, SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 18));
-        titleLabel.setForeground(new Color(220, 53, 69));
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        titleLabel.setForeground(new Color(231, 76, 60));
         titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel messageLabel = new JLabel("<html><center>" + message + "</center></html>", SwingConstants.CENTER);
-        messageLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-        messageLabel.setForeground(new Color(127, 140, 141));
+        JLabel messageLabel = new JLabel("<html><center>" + message + "</center></html>");
+        messageLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        messageLabel.setForeground(new Color(200, 200, 200));
         messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JButton okButton = new JButton("Понятно");
-        okButton.setFont(new Font("Arial", Font.BOLD, 14));
+        JButton okButton = new JButton("Понятно") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                g2.setColor(new Color(231, 76, 60));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+
+                g2.setColor(Color.WHITE);
+                g2.setFont(getFont());
+                FontMetrics fm = g2.getFontMetrics();
+                String text = getText();
+                int x = (getWidth() - fm.stringWidth(text)) / 2;
+                int y = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
+                g2.drawString(text, x, y);
+                g2.dispose();
+            }
+        };
+        okButton.setPreferredSize(new Dimension(120, 40));
+        okButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
         okButton.setForeground(Color.WHITE);
-        okButton.setBackground(new Color(220, 53, 69));
-        okButton.setBorder(BorderFactory.createEmptyBorder(8, 25, 8, 25));
+        okButton.setBorder(BorderFactory.createEmptyBorder());
+        okButton.setContentAreaFilled(false);
         okButton.setFocusPainted(false);
         okButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
         okButton.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         okButton.addActionListener(e -> errorDialog.dispose());
 
-        okButton.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseEntered(java.awt.event.MouseEvent evt) {
-                okButton.setBackground(new Color(200, 35, 51));
-            }
-            public void mouseExited(java.awt.event.MouseEvent evt) {
-                okButton.setBackground(new Color(220, 53, 69));
-            }
-        });
-
         contentPanel.add(iconLabel);
-        contentPanel.add(Box.createVerticalStrut(10));
+        contentPanel.add(Box.createVerticalStrut(15));
         contentPanel.add(titleLabel);
         contentPanel.add(Box.createVerticalStrut(10));
         contentPanel.add(messageLabel);
         contentPanel.add(Box.createVerticalStrut(20));
         contentPanel.add(okButton);
 
-        errorDialog.add(contentPanel, BorderLayout.CENTER);
+        errorDialog.add(contentPanel);
         errorDialog.getRootPane().setDefaultButton(okButton);
-        errorDialog.pack();
         errorDialog.setLocationRelativeTo(this);
         errorDialog.setVisible(true);
     }
 
-    // Показать статус с цветом
     private void showStatus(String message, Color color) {
         statusLabel.setText(message);
         statusLabel.setForeground(color);
+        statusLabel.repaint();
+    }
+
+    private void startLoadingAnimation() {
+        statusLabel.setText("Отправка данных на сервер");
+        statusLabel.setForeground(new Color(155, 89, 182));
+    }
+
+    private void stopLoadingAnimation() {
+        // Ничего не делаем
+    }
+
+    // Красивое окно успешной регистрации с большой кнопкой внизу
+    private void showSuccessDialog(String username) {
+        // Очищаем статус под кнопкой
+        showStatus(" ", Color.BLACK);
+
+        JDialog successDialog = new JDialog(this, "", true);
+        successDialog.setUndecorated(true);
+        successDialog.setSize(450, 450);
+        successDialog.setLocationRelativeTo(this);
+        successDialog.setResizable(false);
+        successDialog.setShape(new RoundRectangle2D.Double(0, 0, 450, 450, 25, 25));
+
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BorderLayout());
+        contentPanel.setBackground(new Color(30, 30, 40));
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
+
+        // Панель для контента (все кроме кнопки)
+        JPanel contentTopPanel = new JPanel();
+        contentTopPanel.setLayout(new BoxLayout(contentTopPanel, BoxLayout.Y_AXIS));
+        contentTopPanel.setOpaque(false);
+
+        // Иконка успеха
+        JLabel iconLabel = new JLabel("✓") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                GradientPaint gradient = new GradientPaint(0, 0, new Color(46, 204, 113),
+                        0, getHeight(), new Color(39, 174, 96));
+                g2.setPaint(gradient);
+                g2.fillOval(0, 0, getWidth(), getHeight());
+
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Segoe UI", Font.BOLD, 36));
+                FontMetrics fm = g2.getFontMetrics();
+                int x = (getWidth() - fm.stringWidth("✓")) / 2;
+                int y = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
+                g2.drawString("✓", x, y);
+                g2.dispose();
+            }
+        };
+        iconLabel.setPreferredSize(new Dimension(80, 80));
+        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel titleLabel = new JLabel("Успешная регистрация!");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel messageLabel = new JLabel("<html><center>Пользователь <b style='color:#9b59b6'>" + username + "</b><br>успешно зарегистрирован!</center></html>");
+        messageLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        messageLabel.setForeground(new Color(200, 200, 200));
+        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Собираем верхнюю часть
+        contentTopPanel.add(iconLabel);
+        contentTopPanel.add(Box.createVerticalStrut(25));
+        contentTopPanel.add(titleLabel);
+        contentTopPanel.add(Box.createVerticalStrut(20));
+        contentTopPanel.add(messageLabel);
+
+        // Кнопка "Понятно" - БОЛЬШАЯ и внизу
+        JButton okButton = new JButton("ПОНЯТНО") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                GradientPaint gradient = new GradientPaint(0, 0, new Color(155, 89, 182),
+                        0, getHeight(), new Color(142, 68, 173));
+                g2.setPaint(gradient);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 25, 25);
+
+                g2.setColor(Color.WHITE);
+                g2.setFont(getFont());
+                FontMetrics fm = g2.getFontMetrics();
+                String text = getText();
+                int x = (getWidth() - fm.stringWidth(text)) / 2;
+                int y = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
+                g2.drawString(text, x, y);
+                g2.dispose();
+            }
+        };
+        okButton.setPreferredSize(new Dimension(300, 60));
+        okButton.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        okButton.setForeground(Color.WHITE);
+        okButton.setBorder(BorderFactory.createEmptyBorder());
+        okButton.setContentAreaFilled(false);
+        okButton.setFocusPainted(false);
+        okButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        okButton.addActionListener(e -> {
+            successDialog.dispose();
+            disposeWithAnimation();
+        });
+
+        // Добавляем компоненты в основную панель
+        contentPanel.add(contentTopPanel, BorderLayout.CENTER);
+        contentPanel.add(okButton, BorderLayout.SOUTH);
+
+        successDialog.add(contentPanel);
+        successDialog.getRootPane().setDefaultButton(okButton);
+        successDialog.setLocationRelativeTo(this);
+        successDialog.setVisible(true);
+    }
+
+    private JLabel createClickableLoginLabel() {
+        JLabel loginLabel = new JLabel("Войдите");
+        loginLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        loginLabel.setForeground(new Color(155, 89, 182));
+        loginLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        loginLabel.setOpaque(false);
+
+        loginLabel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                disposeWithAnimation();
+            }
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                loginLabel.setForeground(new Color(142, 68, 173));
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                loginLabel.setForeground(new Color(155, 89, 182));
+            }
+        });
+
+        return loginLabel;
     }
 }
