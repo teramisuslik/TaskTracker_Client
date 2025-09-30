@@ -1,6 +1,7 @@
 package org.example;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -33,6 +34,9 @@ class UserApplicationFrame extends JFrame {
     private JButton allTasksResetFiltersButton;
     private List<Task> originalAllUsersTasks;
 
+    private NotificationManager notificationManager;
+    private UserNotificationConsumer notificationConsumer;
+
 
     public UserApplicationFrame(String token, Map<String, Object> userInfo) {
         this.authToken = token;
@@ -62,6 +66,9 @@ class UserApplicationFrame extends JFrame {
         contentPane.add(topPanel, BorderLayout.NORTH);
         contentPane.add(centerPanel, BorderLayout.CENTER);
         add(contentPane);
+
+        // Инициализация системы уведомлений
+        initializeNotificationSystem();
 
         loadUserTasksForStatistics();
 
@@ -282,54 +289,6 @@ class UserApplicationFrame extends JFrame {
         tasksPanel.add(scrollPane, BorderLayout.CENTER);
     }
 
-    private void showTaskComments(Task task) {
-        JDialog commentsDialog = new JDialog(this, "Комментарии к задаче: " + task.getTitle(), true);
-        commentsDialog.setSize(500, 400);
-        commentsDialog.setLocationRelativeTo(this);
-        commentsDialog.setLayout(new BorderLayout());
-
-        JPanel contentPanel = new JPanel(new BorderLayout());
-        contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-
-        // Заголовок
-        JLabel titleLabel = new JLabel("Комментарии к задаче: " + task.getTitle(), SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 16));
-        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
-        contentPanel.add(titleLabel, BorderLayout.NORTH);
-
-        // Список комментариев
-        JPanel commentsListPanel = new JPanel();
-        commentsListPanel.setLayout(new BoxLayout(commentsListPanel, BoxLayout.Y_AXIS));
-        commentsListPanel.setBackground(Color.WHITE);
-
-        if (task.getComments() != null && !task.getComments().isEmpty()) {
-            for (Comment comment : task.getComments()) {
-                JPanel commentPanel = createCommentPanel(comment);
-                commentsListPanel.add(commentPanel);
-                commentsListPanel.add(Box.createVerticalStrut(5));
-            }
-        } else {
-            JLabel noCommentsLabel = new JLabel("Комментарии отсутствуют", SwingConstants.CENTER);
-            noCommentsLabel.setFont(new Font("Arial", Font.ITALIC, 14));
-            noCommentsLabel.setForeground(Color.GRAY);
-            commentsListPanel.add(noCommentsLabel);
-        }
-
-        JScrollPane scrollPane = new JScrollPane(commentsListPanel);
-        scrollPane.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200)));
-        contentPanel.add(scrollPane, BorderLayout.CENTER);
-
-        // Кнопка закрытия
-        JButton closeButton = new JButton("Закрыть");
-        closeButton.addActionListener(e -> commentsDialog.dispose());
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        buttonPanel.add(closeButton);
-        contentPanel.add(buttonPanel, BorderLayout.SOUTH);
-
-        commentsDialog.add(contentPanel);
-        commentsDialog.setVisible(true);
-    }
-
     private JPanel createCommentPanel(Comment comment) {
         JPanel commentPanel = new JPanel(new BorderLayout());
         commentPanel.setBackground(new Color(248, 249, 250));
@@ -455,10 +414,6 @@ class UserApplicationFrame extends JFrame {
     private void performLogout() {
         LoginFrame.clearToken();
         dispose();
-        SwingUtilities.invokeLater(() -> new LoginFrame().setVisible(true));
-    }
-
-    private void onWindowClosing() {
         SwingUtilities.invokeLater(() -> new LoginFrame().setVisible(true));
     }
 
@@ -724,44 +679,6 @@ class UserApplicationFrame extends JFrame {
         }
     }
 
-    private Task parseSingleTask(String taskJson) {
-        try {
-            System.out.println("DEBUG: Parsing task: " + taskJson);
-
-            String title = extractValue(taskJson, "title");
-            String description = extractValue(taskJson, "description");
-            String status = extractValue(taskJson, "status");
-            String importance = extractValue(taskJson, "importance");
-            String deadline = extractValue(taskJson, "deadline");
-
-            if (title != null) {
-                Task task = new Task();
-                task.setTitle(title);
-                task.setDescription(description);
-                task.setStatus(status);
-                task.setImportance(importance);
-                task.setDeadline(deadline);
-
-                // Парсинг комментариев
-                if (taskJson.contains("\"comments\":")) {
-                    int commentsStart = taskJson.indexOf("\"comments\":[") + 11;
-                    int commentsEnd = taskJson.indexOf("]", commentsStart);
-                    if (commentsEnd > commentsStart) {
-                        String commentsArray = taskJson.substring(commentsStart, commentsEnd);
-                        List<Comment> comments = parseCommentsArray(commentsArray);
-                        task.setComments(comments);
-                        System.out.println("DEBUG: Found " + comments.size() + " comments for task: " + title);
-                    }
-                }
-                return task;
-            }
-        } catch (Exception e) {
-            System.out.println("DEBUG: Error parsing task: " + e.getMessage());
-            e.printStackTrace();
-        }
-        return null;
-    }
-
     private User getUserWithTasks() {
         try {
             // Используем текущего пользователя (this.username), а не захардкоженное значение
@@ -923,48 +840,6 @@ class UserApplicationFrame extends JFrame {
     private void showDashboard() {
         // При переходе на главную обновляем статистику ТОЛЬКО текущего пользователя
         loadUserTasksForStatistics();
-    }
-
-    private boolean sendStatusUpdateToServer(Task task, String newStatus) {
-        try {
-            String url;
-
-            // Выбираем правильный endpoint в зависимости от нового статуса
-            if ("В_РАБОТЕ".equals(newStatus)) {
-                url = "http://localhost:8080/markthetaskasinwork?title=" +
-                        java.net.URLEncoder.encode(task.getTitle(), "UTF-8");
-            } else if ("ЗАВЕРШЕНА".equals(newStatus)) {
-                url = "http://localhost:8080/markthetaskascompleted?title=" +
-                        java.net.URLEncoder.encode(task.getTitle(), "UTF-8");
-            } else {
-                System.out.println("DEBUG: Unknown status for update: " + newStatus);
-                return false;
-            }
-
-            System.out.println("DEBUG: Sending status update to: " + url);
-
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(10))
-                    .build();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(url))
-                    .header("Authorization", "Bearer " + authToken)
-                    .PUT(HttpRequest.BodyPublishers.noBody())
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            System.out.println("DEBUG: Status update response: " + response.statusCode());
-            System.out.println("DEBUG: Status update body: " + response.body());
-
-            return response.statusCode() == 200;
-
-        } catch (Exception e) {
-            System.out.println("DEBUG: Error updating task status: " + e.getMessage());
-            e.printStackTrace();
-            return false;
-        }
     }
 
     private void updateTaskStatus(Task task, String newStatus) {
@@ -1517,200 +1392,6 @@ class UserApplicationFrame extends JFrame {
             userTasks = new ArrayList<>(originalUserTasks);
             refreshTasksDisplay();
         }
-    }
-
-    private void addTaskRow(JPanel parent, Task task, boolean showUsername, String username) {
-        int columns = showUsername ? 7 : 6; // Добавляем колонку для действий
-        JPanel taskRow = new JPanel(new GridLayout(1, columns, 10, 5));
-        taskRow.setBackground(Color.WHITE);
-        taskRow.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(220, 220, 220)),
-                BorderFactory.createEmptyBorder(10, 15, 10, 15)
-        ));
-        taskRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
-
-        // Колонка пользователя (только для всех задач)
-        if (showUsername) {
-            JLabel userLabel = new JLabel(username != null ? username : "");
-            userLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-            userLabel.setForeground(new Color(44, 62, 80));
-            taskRow.add(userLabel);
-        }
-
-        // Колонка названия задачи
-        JLabel titleLabel = new JLabel(task.getTitle() != null ? task.getTitle() : "");
-        titleLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-        titleLabel.setForeground(new Color(44, 62, 80));
-        taskRow.add(titleLabel);
-
-        // Колонка статуса
-        JLabel statusLabel = new JLabel(task.getStatus() != null ? getStatusDisplayName(task.getStatus()) : "");
-        statusLabel.setFont(new Font("Arial", Font.BOLD, 12));
-        statusLabel.setForeground(getStatusColor(task.getStatus()));
-        taskRow.add(statusLabel);
-
-        // Колонка приоритета
-        JLabel priorityLabel = new JLabel(getImportanceDisplayName(task.getImportance()));
-        priorityLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-        priorityLabel.setForeground(getImportanceColor(task.getImportance()));
-        taskRow.add(priorityLabel);
-
-        // Колонка дедлайна
-        String deadline = task.getDeadline() != null ? task.getDeadline().toString() : "";
-        if (deadline.contains("T")) deadline = deadline.substring(0, deadline.indexOf("T"));
-        JLabel deadlineLabel = new JLabel(deadline);
-        deadlineLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-        deadlineLabel.setForeground(new Color(44, 62, 80));
-        taskRow.add(deadlineLabel);
-
-        // Колонка комментариев
-        int commentCount = task.getComments() != null ? task.getComments().size() : 0;
-        JLabel commentsLabel = new JLabel(commentCount + " коммент.");
-        commentsLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-        commentsLabel.setForeground(commentCount > 0 ? new Color(52, 152, 219) : Color.GRAY);
-
-        // Делаем кликабельным только если есть комментарии
-        if (commentCount > 0) {
-            commentsLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
-            commentsLabel.addMouseListener(new java.awt.event.MouseAdapter() {
-                public void mouseClicked(java.awt.event.MouseEvent evt) {
-                    showTaskComments(task);
-                }
-                public void mouseEntered(java.awt.event.MouseEvent evt) {
-                    commentsLabel.setForeground(new Color(41, 128, 185));
-                }
-                public void mouseExited(java.awt.event.MouseEvent evt) {
-                    commentsLabel.setForeground(new Color(52, 152, 219));
-                }
-            });
-        }
-        taskRow.add(commentsLabel);
-
-        // Колонка действий (кнопка изменения статуса)
-        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
-        actionPanel.setBackground(Color.WHITE);
-
-        // Показываем кнопку только для текущего пользователя (не в разделе "Все задачи")
-        if (!showUsername) {
-            JButton statusButton = createStatusButton(task);
-            if (statusButton != null) {
-                actionPanel.add(statusButton);
-            } else {
-                // Если кнопки нет (например, для завершенных задач), показываем статус текстом
-                JLabel statusText = new JLabel(getStatusDisplayName(task.getStatus()));
-                statusText.setFont(new Font("Arial", Font.PLAIN, 11));
-                statusText.setForeground(getStatusColor(task.getStatus()));
-                actionPanel.add(statusText);
-            }
-        } else {
-            // В разделе "Все задачи" показываем пустую ячейку или текст
-            JLabel noActionLabel = new JLabel("-");
-            noActionLabel.setForeground(Color.GRAY);
-            noActionLabel.setFont(new Font("Arial", Font.PLAIN, 11));
-            actionPanel.add(noActionLabel);
-        }
-
-        taskRow.add(actionPanel);
-
-        parent.add(taskRow);
-    }
-
-    private String getStatusDisplayName(String status) {
-        if (status == null) return "";
-        switch (status) {
-            case "НЕ_НАЧАТА": return "Не начата";
-            case "В_РАБОТЕ": return "В работе";
-            case "ЗАВЕРШЕНА": return "Завершена";
-            case "НА_ДОРАБОТКЕ": return "На доработке";
-            default: return status;
-        }
-    }
-
-    private String getImportanceDisplayName(String importance) {
-        if (importance == null) return "";
-        switch (importance) {
-            case "СРОЧНАЯ": return "Срочная";
-            case "НАДО_ПОТОРОПИТЬСЯ": return "Средняя";
-            case "МОЖЕТ_ПОДОЖДАТЬ": return "Низкая";
-            default: return importance;
-        }
-    }
-
-    private Color getImportanceColor(String importance) {
-        if (importance == null) return Color.BLACK;
-        switch (importance) {
-            case "СРОЧНАЯ": return new Color(231, 76, 60); // Красный
-            case "НАДО_ПОТОРОПИТЬСЯ": return new Color(241, 196, 15); // Желтый
-            case "МОЖЕТ_ПОДОЖДАТЬ": return new Color(46, 204, 113); // Зеленый
-            default: return Color.BLACK;
-        }
-    }
-
-    private Color getStatusColor(String status) {
-        if (status == null) return Color.BLACK;
-        switch (status) {
-            case "ЗАВЕРШЕНА": return new Color(46, 204, 113); // Зеленый
-            case "В_РАБОТЕ": return new Color(241, 196, 15); // Желтый
-            case "НЕ_НАЧАТА": return new Color(52, 152, 219); // Синий
-            case "НА_ДОРАБОТКЕ": return new Color(231, 76, 60); // Красный
-            default: return Color.BLACK;
-        }
-    }
-
-    private JButton createStatusButton(Task task) {
-        if (task.getStatus() == null) return null;
-
-        String currentStatus = task.getStatus();
-        JButton button = new JButton();
-
-        switch (currentStatus) {
-            case "НЕ_НАЧАТА":
-                button.setText("Начать работу");
-                button.setBackground(new Color(52, 152, 219)); // Синий
-                button.setForeground(Color.WHITE);
-                button.addActionListener(e -> updateTaskStatus(task, "В_РАБОТЕ"));
-                break;
-
-            case "В_РАБОТЕ":
-                button.setText("Завершить");
-                button.setBackground(new Color(46, 204, 113)); // Зеленый
-                button.setForeground(Color.WHITE);
-                button.addActionListener(e -> updateTaskStatus(task, "ЗАВЕРШЕНА"));
-                break;
-
-            case "ЗАВЕРШЕНА":
-                // Для завершенных задач не показываем кнопку
-                return null;
-
-            case "НА_ДОРАБОТКЕ":
-                button.setText("Завершить");
-                button.setBackground(new Color(46, 204, 113)); // Зеленый
-                button.setForeground(Color.WHITE);
-                button.addActionListener(e -> updateTaskStatus(task, "ЗАВЕРШЕНА"));
-                break;
-
-            default:
-                return null;
-        }
-
-        button.setFont(new Font("Arial", Font.BOLD, 11));
-        button.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
-        button.setFocusPainted(false);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
-        // Добавляем эффекты при наведении
-        Color originalColor = button.getBackground();
-        button.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseEntered(java.awt.event.MouseEvent evt) {
-                button.setBackground(originalColor.darker());
-            }
-
-            public void mouseExited(java.awt.event.MouseEvent evt) {
-                button.setBackground(originalColor);
-            }
-        });
-
-        return button;
     }
 
     private JPanel createFiltersPanel() {
@@ -2390,14 +2071,236 @@ class UserApplicationFrame extends JFrame {
         }).start();
     }
 
+    private void initializeNotificationSystem() {
+        // Создаем менеджер уведомлений
+        notificationManager = new NotificationManager(this);
+
+        // Создаем и запускаем consumer для уведомлений пользователя
+        notificationConsumer = new UserNotificationConsumer(notificationManager, this.username);
+        notificationConsumer.startConsuming();
+
+        System.out.println("User notification system initialized for: " + this.username);
+    }
+
+    // Добавьте метод для корректного закрытия
+    @Override
+    public void dispose() {
+        // Останавливаем consumer при закрытии окна
+        if (notificationConsumer != null) {
+            notificationConsumer.stop();
+        }
+        super.dispose();
+    }
+
+    private void onWindowClosing() {
+        // Останавливаем consumer при закрытии окна
+        if (notificationConsumer != null) {
+            notificationConsumer.stop();
+        }
+
+        SwingUtilities.invokeLater(() -> new LoginFrame().setVisible(true));
+    }
+
+    private boolean sendStatusUpdateToServer(Task task, String newStatus) {
+        try {
+            // Проверяем, что taskId не null
+            if (task.getTaskId() == null) {
+                System.out.println("DEBUG: Task ID is null for task: " + task.getTitle());
+                return false;
+            }
+
+            String url;
+
+            // Выбираем правильный endpoint в зависимости от нового статуса
+            if ("В_РАБОТЕ".equals(newStatus)) {
+                url = "http://localhost:8080/markthetaskasinwork?taskId=" + task.getTaskId();
+            } else if ("ЗАВЕРШЕНА".equals(newStatus)) {
+                url = "http://localhost:8080/markthetaskascompleted?taskId=" + task.getTaskId();
+            } else {
+                System.out.println("DEBUG: Unknown status for update: " + newStatus);
+                return false;
+            }
+
+            System.out.println("DEBUG: Sending status update to: " + url);
+            System.out.println("DEBUG: Task ID: " + task.getTaskId() + ", Title: " + task.getTitle());
+
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .build();
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(url))
+                    .header("Authorization", "Bearer " + authToken)
+                    .PUT(HttpRequest.BodyPublishers.noBody())
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            System.out.println("DEBUG: Status update response: " + response.statusCode());
+            System.out.println("DEBUG: Status update body: " + response.body());
+
+            return response.statusCode() == 200;
+
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error updating task status: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private Task parseSingleTask(String taskJson) {
+        try {
+            System.out.println("DEBUG: Parsing task JSON: " + taskJson);
+
+            String idStr = extractValue(taskJson, "id");
+            String title = extractValue(taskJson, "title");
+            String description = extractValue(taskJson, "description");
+            String status = extractValue(taskJson, "status");
+            String importance = extractValue(taskJson, "importance");
+            String deadline = extractValue(taskJson, "deadline");
+
+            System.out.println("DEBUG: Extracted values - ID: '" + idStr + "', Title: '" + title + "'");
+
+            if (title != null) {
+                Task task = new Task();
+
+                // Устанавливаем taskId
+                if (idStr != null && !idStr.isEmpty() && !idStr.equals("null")) {
+                    try {
+                        task.setTaskId(Long.parseLong(idStr));
+                        System.out.println("DEBUG: Successfully set task ID: " + idStr + " for task: " + title);
+                    } catch (NumberFormatException e) {
+                        System.out.println("DEBUG: Error parsing task ID: '" + idStr + "' for task: " + title);
+                        // Можно установить временный ID или оставить null
+                        task.setTaskId(null);
+                    }
+                } else {
+                    System.out.println("DEBUG: Task ID is null or empty for task: " + title);
+                    task.setTaskId(null);
+                }
+
+                task.setTitle(title);
+                task.setDescription(description);
+                task.setStatus(status);
+                task.setImportance(importance);
+                task.setDeadline(deadline);
+
+                // Парсинг комментариев
+                if (taskJson.contains("\"comments\":")) {
+                    int commentsStart = taskJson.indexOf("\"comments\":[") + 11;
+                    int commentsEnd = taskJson.indexOf("]", commentsStart);
+                    if (commentsEnd > commentsStart) {
+                        String commentsArray = taskJson.substring(commentsStart, commentsEnd);
+                        List<Comment> comments = parseCommentsArray(commentsArray);
+                        task.setComments(comments);
+                        System.out.println("DEBUG: Found " + comments.size() + " comments for task: " + title);
+                    }
+                }
+                return task;
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: Error parsing task: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private void loadUserTasks(String username, DefaultTableModel tasksTableModel) {
+        showLoadingDialog("Загрузка задач пользователя...");
+
+        new Thread(() -> {
+            try {
+                List<User> users = getAllUsersWithTasks();
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    tasksTableModel.setRowCount(0);
+
+                    if (users != null) {
+                        for (User user : users) {
+                            if (user.getUsername().equals(username) && user.getTasks() != null) {
+                                for (Task task : user.getTasks()) {
+                                    String deadline = task.getDeadline() != null ?
+                                            DeadlineUtils.formatDeadlineForDisplay(task.getDeadline()) : "нет дедлайна";
+                                    String statusWithDays = getStatusDisplayName(task.getStatus()) + " (" +
+                                            DeadlineUtils.getDeadlineStatusText(task.getDeadline()) + ")";
+
+                                    tasksTableModel.addRow(new Object[]{
+                                            task.getTitle(),
+                                            statusWithDays,
+                                            getImportanceDisplayName(task.getImportance()),
+                                            deadline
+                                    });
+                                }
+                                break;
+                            }
+                        }
+                    }
+                });
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    showErrorMessage("Ошибка загрузки задач: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    private JDialog loadingDialog;
+    private JProgressBar progressBar;
+
+    public void showLoadingDialog(String message) {
+        if (loadingDialog == null) {
+            loadingDialog = new JDialog(this, "Загрузка", true);
+            loadingDialog.setSize(300, 120);
+            loadingDialog.setLocationRelativeTo(this);
+            loadingDialog.setLayout(new BorderLayout());
+            loadingDialog.setResizable(false);
+            loadingDialog.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+
+            JPanel loadingPanel = new JPanel(new BorderLayout());
+            loadingPanel.setBackground(Color.WHITE);
+            loadingPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+
+            JLabel loadingLabel = new JLabel("Загрузка...", SwingConstants.CENTER);
+            loadingLabel.setFont(new Font("Arial", Font.PLAIN, 14));
+            loadingLabel.setForeground(new Color(44, 62, 80));
+
+            progressBar = new JProgressBar();
+            progressBar.setIndeterminate(true);
+            progressBar.setBackground(Color.WHITE);
+
+            loadingPanel.add(loadingLabel, BorderLayout.CENTER);
+            loadingPanel.add(progressBar, BorderLayout.SOUTH);
+
+            loadingDialog.add(loadingPanel, BorderLayout.CENTER);
+        }
+
+        // Обновляем сообщение если нужно
+        Component[] components = ((JPanel)loadingDialog.getContentPane().getComponent(0)).getComponents();
+        for (Component comp : components) {
+            if (comp instanceof JLabel) {
+                ((JLabel)comp).setText(message);
+                break;
+            }
+        }
+
+        loadingDialog.setVisible(true);
+    }
+
+    public void hideLoadingDialog() {
+        if (loadingDialog != null && loadingDialog.isVisible()) {
+            loadingDialog.setVisible(false);
+        }
+    }
+
     private JPanel createTableHeader(boolean showUsername) {
-        int columns = showUsername ? 7 : 6;
+        int columns = showUsername ? 8 : 7; // Увеличиваем на 1 колонку для описания
         JPanel headerPanel = new JPanel(new GridLayout(1, columns, 10, 5));
         headerPanel.setBackground(new Color(240, 240, 240));
         headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
         headerPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
 
-        // Устанавливаем предпочтительные размеры для колонок
+        // Колонка пользователя (только для всех задач)
         if (showUsername) {
             JLabel userHeaderLabel = new JLabel("Пользователь");
             userHeaderLabel.setFont(new Font("Arial", Font.BOLD, 12));
@@ -2405,7 +2308,8 @@ class UserApplicationFrame extends JFrame {
             headerPanel.add(userHeaderLabel);
         }
 
-        String[] headers = {"Название задачи", "Статус", "Приоритет", "Дедлайн", "Комментарии", "Действия"};
+        // Новый порядок колонок: Название, Описание, Статус, Приоритет, Дедлайн, Комментарии, Действия
+        String[] headers = {"Название задачи", "Описание", "Статус", "Срочность", "Дедлайн", "Комментарии", "Действия"};
         for (String header : headers) {
             JLabel headerLabel = new JLabel(header);
             headerLabel.setFont(new Font("Arial", Font.BOLD, 12));
@@ -2414,5 +2318,534 @@ class UserApplicationFrame extends JFrame {
         }
 
         return headerPanel;
+    }
+
+    private void showTaskComments(Task task) {
+        JDialog commentsDialog = new JDialog(this, "Комментарии к задаче: " + task.getTitle(), true);
+        commentsDialog.setSize(600, 500);
+        commentsDialog.setLocationRelativeTo(this);
+        commentsDialog.setLayout(new BorderLayout());
+        commentsDialog.setResizable(true);
+
+        // Основная панель
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBackground(Color.WHITE);
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(25, 30, 25, 30));
+
+        // Заголовок
+        JPanel headerPanel = new JPanel();
+        headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.Y_AXIS));
+        headerPanel.setBackground(Color.WHITE);
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
+
+        JLabel iconLabel = new JLabel("💬", SwingConstants.CENTER);
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
+        iconLabel.setForeground(new Color(52, 152, 219));
+        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel titleLabel = new JLabel("Комментарии к задаче", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        titleLabel.setForeground(new Color(44, 62, 80));
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel taskTitleLabel = new JLabel("\"" + task.getTitle() + "\"", SwingConstants.CENTER);
+        taskTitleLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+        taskTitleLabel.setForeground(new Color(127, 140, 141));
+        taskTitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        headerPanel.add(iconLabel);
+        headerPanel.add(Box.createVerticalStrut(10));
+        headerPanel.add(titleLabel);
+        headerPanel.add(Box.createVerticalStrut(5));
+        headerPanel.add(taskTitleLabel);
+
+        // Панель с комментариями
+        JPanel commentsContentPanel = new JPanel(new BorderLayout());
+        commentsContentPanel.setBackground(Color.WHITE);
+        commentsContentPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(220, 220, 220), 1),
+                BorderFactory.createEmptyBorder(5, 5, 5, 5)
+        ));
+
+        JPanel commentsListPanel = new JPanel();
+        commentsListPanel.setLayout(new BoxLayout(commentsListPanel, BoxLayout.Y_AXIS));
+        commentsListPanel.setBackground(Color.WHITE);
+
+        if (task.getComments() != null && !task.getComments().isEmpty()) {
+            for (int i = 0; i < task.getComments().size(); i++) {
+                Comment comment = task.getComments().get(i);
+                JPanel commentPanel = createModernCommentPanel(comment, i + 1);
+                commentsListPanel.add(commentPanel);
+                commentsListPanel.add(Box.createVerticalStrut(10));
+            }
+        } else {
+            JPanel noCommentsPanel = new JPanel(new BorderLayout());
+            noCommentsPanel.setBackground(new Color(248, 249, 250));
+            noCommentsPanel.setBorder(BorderFactory.createEmptyBorder(40, 20, 40, 20));
+
+            JLabel noCommentsLabel = new JLabel("Комментарии отсутствуют", SwingConstants.CENTER);
+            noCommentsLabel.setFont(new Font("Arial", Font.ITALIC, 16));
+            noCommentsLabel.setForeground(new Color(158, 158, 158));
+
+            noCommentsPanel.add(noCommentsLabel, BorderLayout.CENTER);
+            commentsListPanel.add(noCommentsPanel);
+        }
+
+        JScrollPane scrollPane = new JScrollPane(commentsListPanel);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.setPreferredSize(new Dimension(500, 300));
+
+        commentsContentPanel.add(scrollPane, BorderLayout.CENTER);
+
+        // Панель статистики
+        JPanel statsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        statsPanel.setBackground(Color.WHITE);
+        statsPanel.setBorder(BorderFactory.createEmptyBorder(15, 0, 0, 0));
+
+        int commentCount = task.getComments() != null ? task.getComments().size() : 0;
+        JLabel statsLabel = new JLabel("Всего комментариев: " + commentCount);
+        statsLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        statsLabel.setForeground(new Color(108, 117, 125));
+        statsLabel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(52, 152, 219), 1),
+                BorderFactory.createEmptyBorder(5, 10, 5, 10)
+        ));
+
+        statsPanel.add(statsLabel);
+
+        // Панель кнопок
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
+        buttonPanel.setBackground(Color.WHITE);
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
+
+        JButton closeButton = new JButton("Закрыть");
+        styleUserDialogButton(closeButton, new Color(108, 117, 125));
+
+        closeButton.addActionListener(e -> commentsDialog.dispose());
+
+        buttonPanel.add(closeButton);
+
+        // Собираем все компоненты
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
+        mainPanel.add(commentsContentPanel, BorderLayout.CENTER);
+        mainPanel.add(statsPanel, BorderLayout.SOUTH);
+
+        commentsDialog.add(mainPanel, BorderLayout.CENTER);
+        commentsDialog.add(buttonPanel, BorderLayout.SOUTH);
+
+        commentsDialog.getRootPane().setDefaultButton(closeButton);
+        commentsDialog.pack();
+        commentsDialog.setLocationRelativeTo(this);
+        commentsDialog.setVisible(true);
+    }
+
+    private JPanel createModernCommentPanel(Comment comment, int number) {
+        JPanel commentPanel = new JPanel(new BorderLayout());
+        commentPanel.setBackground(new Color(248, 249, 250));
+        commentPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(220, 220, 220), 1),
+                BorderFactory.createEmptyBorder(15, 15, 15, 15)
+        ));
+        commentPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 120));
+
+        // Заголовок комментария
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBackground(new Color(248, 249, 250));
+
+        JLabel numberLabel = new JLabel("Комментарий #" + number);
+        numberLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        numberLabel.setForeground(new Color(52, 152, 219));
+
+        // Если есть ID комментария, показываем его
+        if (comment.getId() != null) {
+            JLabel idLabel = new JLabel("ID: " + comment.getId());
+            idLabel.setFont(new Font("Arial", Font.PLAIN, 10));
+            idLabel.setForeground(new Color(158, 158, 158));
+            headerPanel.add(idLabel, BorderLayout.EAST);
+        }
+
+        headerPanel.add(numberLabel, BorderLayout.WEST);
+
+        // Текст комментария
+        JTextArea commentText = new JTextArea(comment.getDescription() != null ? comment.getDescription() : "");
+        commentText.setEditable(false);
+        commentText.setLineWrap(true);
+        commentText.setWrapStyleWord(true);
+        commentText.setBackground(new Color(248, 249, 250));
+        commentText.setFont(new Font("Arial", Font.PLAIN, 13));
+        commentText.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
+        commentText.setForeground(new Color(44, 62, 80));
+
+        // Добавляем скролл для длинных комментариев
+        JScrollPane textScroll = new JScrollPane(commentText);
+        textScroll.setBorder(BorderFactory.createEmptyBorder());
+        textScroll.setBackground(new Color(248, 249, 250));
+        textScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        textScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+
+        commentPanel.add(headerPanel, BorderLayout.NORTH);
+        commentPanel.add(textScroll, BorderLayout.CENTER);
+
+        return commentPanel;
+    }
+
+    private void showTaskDescription(Task task) {
+        JDialog descriptionDialog = new JDialog(this, "Описание задачи: " + task.getTitle(), true);
+        descriptionDialog.setSize(600, 500);
+        descriptionDialog.setLocationRelativeTo(this);
+        descriptionDialog.setLayout(new BorderLayout());
+        descriptionDialog.setResizable(true);
+
+        // Основная панель
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBackground(Color.WHITE);
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(25, 30, 25, 30));
+
+        // Заголовок
+        JPanel headerPanel = new JPanel();
+        headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.Y_AXIS));
+        headerPanel.setBackground(Color.WHITE);
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
+
+        JLabel iconLabel = new JLabel("📄", SwingConstants.CENTER);
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
+        iconLabel.setForeground(new Color(52, 152, 219));
+        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel titleLabel = new JLabel("Описание задачи", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        titleLabel.setForeground(new Color(44, 62, 80));
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel taskTitleLabel = new JLabel("\"" + task.getTitle() + "\"", SwingConstants.CENTER);
+        taskTitleLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+        taskTitleLabel.setForeground(new Color(127, 140, 141));
+        taskTitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        headerPanel.add(iconLabel);
+        headerPanel.add(Box.createVerticalStrut(10));
+        headerPanel.add(titleLabel);
+        headerPanel.add(Box.createVerticalStrut(5));
+        headerPanel.add(taskTitleLabel);
+
+        // Панель с описанием
+        JPanel descriptionContentPanel = new JPanel(new BorderLayout());
+        descriptionContentPanel.setBackground(Color.WHITE);
+        descriptionContentPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(220, 220, 220), 1),
+                BorderFactory.createEmptyBorder(5, 5, 5, 5)
+        ));
+
+        JTextArea descriptionArea = new JTextArea();
+        descriptionArea.setEditable(false);
+        descriptionArea.setLineWrap(true);
+        descriptionArea.setWrapStyleWord(true);
+        descriptionArea.setFont(new Font("Arial", Font.PLAIN, 14));
+
+        String description = task.getDescription();
+        if (description != null && !description.trim().isEmpty()) {
+            descriptionArea.setText(description);
+            descriptionArea.setForeground(new Color(44, 62, 80));
+        } else {
+            descriptionArea.setText("Описание отсутствует");
+            descriptionArea.setFont(new Font("Arial", Font.ITALIC, 14));
+            descriptionArea.setForeground(Color.GRAY);
+        }
+
+        descriptionArea.setBackground(new Color(248, 249, 250));
+        descriptionArea.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JScrollPane scrollPane = new JScrollPane(descriptionArea);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.setPreferredSize(new Dimension(500, 300));
+
+        descriptionContentPanel.add(scrollPane, BorderLayout.CENTER);
+
+        // Панель статистики
+        JPanel statsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        statsPanel.setBackground(Color.WHITE);
+        statsPanel.setBorder(BorderFactory.createEmptyBorder(15, 0, 0, 0));
+
+        int descLength = description != null ? description.length() : 0;
+        JLabel statsLabel = new JLabel("Длина описания: " + descLength + " символов");
+        statsLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        statsLabel.setForeground(new Color(108, 117, 125));
+        statsLabel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(52, 152, 219), 1),
+                BorderFactory.createEmptyBorder(5, 10, 5, 10)
+        ));
+
+        statsPanel.add(statsLabel);
+
+        // Панель кнопок
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
+        buttonPanel.setBackground(Color.WHITE);
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
+
+        JButton closeButton = new JButton("Закрыть");
+        styleUserDialogButton(closeButton, new Color(108, 117, 125));
+
+        closeButton.addActionListener(e -> descriptionDialog.dispose());
+
+        buttonPanel.add(closeButton);
+
+        // Собираем все компоненты
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
+        mainPanel.add(descriptionContentPanel, BorderLayout.CENTER);
+        mainPanel.add(statsPanel, BorderLayout.SOUTH);
+
+        descriptionDialog.add(mainPanel, BorderLayout.CENTER);
+        descriptionDialog.add(buttonPanel, BorderLayout.SOUTH);
+
+        descriptionDialog.getRootPane().setDefaultButton(closeButton);
+        descriptionDialog.pack();
+        descriptionDialog.setLocationRelativeTo(this);
+        descriptionDialog.setVisible(true);
+    }
+
+    private void styleUserDialogButton(JButton button, Color color) {
+        button.setFont(new Font("Arial", Font.BOLD, 14));
+        button.setForeground(Color.WHITE);
+        button.setBackground(color);
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(color.darker(), 1),
+                BorderFactory.createEmptyBorder(10, 25, 10, 25)
+        ));
+        button.setFocusPainted(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(color.darker());
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(color);
+            }
+        });
+    }
+
+    private void addTaskRow(JPanel parent, Task task, boolean showUsername, String username) {
+        int columns = showUsername ? 8 : 7; // Увеличиваем на 1 колонку для описания
+        JPanel taskRow = new JPanel(new GridLayout(1, columns, 10, 5));
+        taskRow.setBackground(Color.WHITE);
+        taskRow.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(220, 220, 220)),
+                BorderFactory.createEmptyBorder(10, 15, 10, 15)
+        ));
+        taskRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
+
+        // Колонка пользователя (только для всех задач)
+        if (showUsername) {
+            JLabel userLabel = new JLabel(username != null ? username : "");
+            userLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+            userLabel.setForeground(new Color(44, 62, 80));
+            taskRow.add(userLabel);
+        }
+
+        // Колонка названия задачи
+        JLabel titleLabel = new JLabel(task.getTitle() != null ? task.getTitle() : "");
+        titleLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        titleLabel.setForeground(new Color(44, 62, 80));
+        taskRow.add(titleLabel);
+
+        // Колонка описания (кликабельная ссылка)
+        String descriptionText = task.getDescription();
+        boolean hasDescription = descriptionText != null && !descriptionText.trim().isEmpty();
+
+        JLabel descriptionLabel = new JLabel(hasDescription ? "📝 Просмотр" : "Нет описания");
+        descriptionLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        descriptionLabel.setForeground(hasDescription ? new Color(52, 152, 219) : Color.GRAY);
+
+        // Делаем кликабельным только если есть описание
+        if (hasDescription) {
+            descriptionLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            descriptionLabel.addMouseListener(new java.awt.event.MouseAdapter() {
+                public void mouseClicked(java.awt.event.MouseEvent evt) {
+                    showTaskDescription(task); // Теперь использует новый красивый диалог
+                }
+                public void mouseEntered(java.awt.event.MouseEvent evt) {
+                    descriptionLabel.setForeground(new Color(41, 128, 185));
+                    descriptionLabel.setText("<html><u>📝 Просмотр</u></html>");
+                }
+                public void mouseExited(java.awt.event.MouseEvent evt) {
+                    descriptionLabel.setForeground(new Color(52, 152, 219));
+                    descriptionLabel.setText("📝 Просмотр");
+                }
+            });
+        }
+        taskRow.add(descriptionLabel);
+
+        // Колонка статуса
+        JLabel statusLabel = new JLabel(task.getStatus() != null ? getStatusDisplayName(task.getStatus()) : "");
+        statusLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        statusLabel.setForeground(getStatusColor(task.getStatus()));
+        taskRow.add(statusLabel);
+
+        // Колонка приоритета
+        JLabel priorityLabel = new JLabel(getImportanceDisplayName(task.getImportance()));
+        priorityLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        priorityLabel.setForeground(getImportanceColor(task.getImportance()));
+        taskRow.add(priorityLabel);
+
+        // Колонка дедлайна с цветом
+        String deadline = task.getDeadline() != null ? task.getDeadline().toString() : "";
+        String formattedDeadline = DeadlineUtils.formatDeadlineForDisplay(deadline);
+        JLabel deadlineLabel = new JLabel(formattedDeadline);
+        deadlineLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        deadlineLabel.setForeground(DeadlineUtils.getDeadlineColor(deadline));
+        taskRow.add(deadlineLabel);
+
+        // Колонка комментариев
+        int commentCount = task.getComments() != null ? task.getComments().size() : 0;
+        JLabel commentsLabel = new JLabel(commentCount + " коммент.");
+        commentsLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        commentsLabel.setForeground(commentCount > 0 ? new Color(52, 152, 219) : Color.GRAY);
+
+        // Делаем кликабельным только если есть комментарии
+        if (commentCount > 0) {
+            commentsLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            commentsLabel.addMouseListener(new java.awt.event.MouseAdapter() {
+                public void mouseClicked(java.awt.event.MouseEvent evt) {
+                    showTaskComments(task); // Теперь использует новый красивый диалог
+                }
+                public void mouseEntered(java.awt.event.MouseEvent evt) {
+                    commentsLabel.setForeground(new Color(41, 128, 185));
+                    commentsLabel.setText("<html><u>" + commentCount + " коммент.</u></html>");
+                }
+                public void mouseExited(java.awt.event.MouseEvent evt) {
+                    commentsLabel.setForeground(new Color(52, 152, 219));
+                    commentsLabel.setText(commentCount + " коммент.");
+                }
+            });
+        }
+        taskRow.add(commentsLabel);
+
+        // Колонка действий (кнопка изменения статуса)
+        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
+        actionPanel.setBackground(Color.WHITE);
+
+        // Показываем кнопку только для текущего пользователя (не в разделе "Все задачи")
+        if (!showUsername) {
+            JButton statusButton = createStatusButton(task);
+            if (statusButton != null) {
+                actionPanel.add(statusButton);
+            } else {
+                // Если кнопки нет (например, для завершенных задач), показываем статус текстом
+                JLabel statusText = new JLabel(getStatusDisplayName(task.getStatus()));
+                statusText.setFont(new Font("Arial", Font.PLAIN, 11));
+                statusText.setForeground(getStatusColor(task.getStatus()));
+                actionPanel.add(statusText);
+            }
+        } else {
+            // В разделе "Все задачи" показываем пустую ячейку или текст
+            JLabel noActionLabel = new JLabel("-");
+            noActionLabel.setForeground(Color.GRAY);
+            noActionLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+            actionPanel.add(noActionLabel);
+        }
+
+        taskRow.add(actionPanel);
+
+        parent.add(taskRow);
+    }
+
+    private String getStatusDisplayName(String status) {
+        if (status == null) return "";
+        switch (status) {
+            case "НЕ_НАЧАТА": return "Не начата";
+            case "В_РАБОТЕ": return "В работе";
+            case "ЗАВЕРШЕНА": return "Завершена";
+            case "НА_ДОРАБОТКЕ": return "На доработке";
+            default: return status;
+        }
+    }
+
+    private String getImportanceDisplayName(String importance) {
+        if (importance == null) return "";
+        switch (importance) {
+            case "СРОЧНАЯ": return "Срочная";
+            case "НАДО_ПОТОРОПИТЬСЯ": return "Средняя";
+            case "МОЖЕТ_ПОДОЖДАТЬ": return "Низкая";
+            default: return importance;
+        }
+    }
+
+    private Color getStatusColor(String status) {
+        if (status == null) return Color.BLACK;
+        switch (status) {
+            case "ЗАВЕРШЕНА": return new Color(46, 204, 113); // Зеленый
+            case "В_РАБОТЕ": return new Color(241, 196, 15); // Желтый
+            case "НЕ_НАЧАТА": return new Color(52, 152, 219); // Синий
+            case "НА_ДОРАБОТКЕ": return new Color(231, 76, 60); // Красный
+            default: return Color.BLACK;
+        }
+    }
+
+    private Color getImportanceColor(String importance) {
+        if (importance == null) return Color.BLACK;
+        switch (importance) {
+            case "СРОЧНАЯ": return new Color(231, 76, 60); // Красный
+            case "НАДО_ПОТОРОПИТЬСЯ": return new Color(241, 196, 15); // Желтый
+            case "МОЖЕТ_ПОДОЖДАТЬ": return new Color(46, 204, 113); // Зеленый
+            default: return Color.BLACK;
+        }
+    }
+
+    private JButton createStatusButton(Task task) {
+        if (task.getStatus() == null) return null;
+
+        String currentStatus = task.getStatus();
+        JButton button = new JButton();
+
+        switch (currentStatus) {
+            case "НЕ_НАЧАТА":
+                button.setText("Начать работу");
+                button.setBackground(new Color(52, 152, 219)); // Синий
+                button.setForeground(Color.WHITE);
+                button.addActionListener(e -> updateTaskStatus(task, "В_РАБОТЕ"));
+                break;
+
+            case "В_РАБОТЕ":
+                button.setText("Завершить");
+                button.setBackground(new Color(46, 204, 113)); // Зеленый
+                button.setForeground(Color.WHITE);
+                button.addActionListener(e -> updateTaskStatus(task, "ЗАВЕРШЕНА"));
+                break;
+
+            case "ЗАВЕРШЕНА":
+                // Для завершенных задач не показываем кнопку
+                return null;
+
+            case "НА_ДОРАБОТКЕ":
+                button.setText("Завершить");
+                button.setBackground(new Color(46, 204, 113)); // Зеленый
+                button.setForeground(Color.WHITE);
+                button.addActionListener(e -> updateTaskStatus(task, "ЗАВЕРШЕНА"));
+                break;
+
+            default:
+                return null;
+        }
+
+        button.setFont(new Font("Arial", Font.BOLD, 11));
+        button.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        button.setFocusPainted(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        // Добавляем эффекты при наведении
+        Color originalColor = button.getBackground();
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(originalColor.darker());
+            }
+
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(originalColor);
+            }
+        });
+
+        return button;
     }
 }
