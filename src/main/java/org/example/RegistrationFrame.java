@@ -100,13 +100,13 @@ public class RegistrationFrame extends JFrame {
         subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         subtitleLabel.setHorizontalAlignment(JLabel.CENTER);
 
-        // Панель для формы с неоморфным эффектом
+        // Панель для формы с неоморфным эффект
         JPanel formPanel = createNeomorphicPanel();
         formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
         formPanel.setMaximumSize(new Dimension(400, 500));
 
-        // Иконка регистрации
-        JLabel userIcon = new JLabel() {
+        // Иконка регистрации - ИСПРАВЛЕННАЯ ВЕРСИЯ
+        JLabel userIcon = new JLabel("👤") {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -118,7 +118,8 @@ public class RegistrationFrame extends JFrame {
                 g2.setPaint(gradient);
                 g2.fillOval(0, 0, getWidth(), getHeight());
 
-                g2.setFont(new Font("Segoe UI", Font.BOLD, 24));
+                // Отображаем смайлик как текст
+                g2.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 32));
                 g2.setColor(Color.WHITE);
                 FontMetrics fm = g2.getFontMetrics();
                 String icon = "👤";
@@ -145,29 +146,8 @@ public class RegistrationFrame extends JFrame {
         confirmPasswordField = createStyledPasswordField();
         confirmPasswordPanel.add(confirmPasswordField);
 
-        // Кнопка регистрации
-        registerButton = new JButton("Создать аккаунт") {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                // Фиолетовый градиент
-                GradientPaint gradient = new GradientPaint(0, 0, new Color(155, 89, 182),
-                        0, getHeight(), new Color(142, 68, 173));
-                g2.setPaint(gradient);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 25, 25);
-
-                g2.setColor(Color.WHITE);
-                g2.setFont(getFont());
-                FontMetrics fm = g2.getFontMetrics();
-                String text = getText();
-                int x = (getWidth() - fm.stringWidth(text)) / 2;
-                int y = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
-                g2.drawString(text, x, y);
-                g2.dispose();
-            }
-        };
+        // Кнопка регистрации - УПРОЩЕННАЯ ВЕРСИЯ БЕЗ АНИМАЦИЙ
+        registerButton = new JButton("Создать аккаунт");
         styleModernRegisterButton(registerButton);
         registerButton.addActionListener(new RegisterButtonListener());
 
@@ -418,23 +398,28 @@ public class RegistrationFrame extends JFrame {
         return label;
     }
 
+    // ОБНОВЛЕННЫЙ МЕТОД СТИЛИЗАЦИИ КНОПКИ
     private void styleModernRegisterButton(JButton button) {
         button.setPreferredSize(new Dimension(320, 50));
         button.setAlignmentX(Component.CENTER_ALIGNMENT);
         button.setFont(new Font("Segoe UI", Font.BOLD, 16));
         button.setForeground(Color.WHITE);
-        button.setBorder(BorderFactory.createEmptyBorder());
-        button.setContentAreaFilled(false);
+        button.setBackground(new Color(155, 89, 182));
+        button.setBorder(BorderFactory.createEmptyBorder(15, 0, 15, 0));
         button.setFocusPainted(false);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+        button.setContentAreaFilled(true);
 
+        // Убираем все эффекты при наведении, кроме смены курсора
         button.addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent evt) {
-                button.repaint();
+                // Только меняем курсор на руку
+                button.setCursor(new Cursor(Cursor.HAND_CURSOR));
             }
 
             public void mouseExited(MouseEvent evt) {
-                button.repaint();
+                // Возвращаем стандартный курсор
+                button.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
             }
         });
     }
@@ -473,7 +458,7 @@ public class RegistrationFrame extends JFrame {
         fadeOut.start();
     }
 
-    // Обработчик кнопки регистрации
+    // ОБНОВЛЕННЫЙ ОБРАБОТЧИК КНОПКИ РЕГИСТРАЦИИ
     private class RegisterButtonListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
@@ -486,20 +471,16 @@ public class RegistrationFrame extends JFrame {
             }
 
             registerButton.setEnabled(false);
-            showStatus("Отправка запроса на сервер...", new Color(155, 89, 182));
-
-            startLoadingAnimation();
+            // УБРАЛ надпись "Отправка запроса на сервер..."
 
             new Thread(() -> {
                 try {
                     String response = sendRegistrationRequest(username, password);
                     SwingUtilities.invokeLater(() -> {
-                        stopLoadingAnimation();
                         handleServerResponse(response, username);
                     });
                 } catch (Exception ex) {
                     SwingUtilities.invokeLater(() -> {
-                        stopLoadingAnimation();
                         showStatus("Ошибка соединения: " + ex.getMessage(), new Color(231, 76, 60));
                         registerButton.setEnabled(true);
                         shakeAnimation();
@@ -564,8 +545,7 @@ public class RegistrationFrame extends JFrame {
                         response.contains("success") ||
                         response.contains("200")) {
 
-                    // УБРАЛ показ статуса "Регистрация успешна!" под кнопкой
-                    // Просто показываем диалог
+                    // Показываем диалог успеха без статуса под кнопкой
                     showSuccessDialog(username);
 
                 } else if (response.contains("username") && response.contains("already")) {
@@ -578,8 +558,7 @@ public class RegistrationFrame extends JFrame {
                     showErrorDialog("Ошибка при регистрации: " + response, "Ошибка сервера");
                     shakeAnimation();
                 } else {
-                    // УБРАЛ показ статуса "Регистрация завершена" под кнопкой
-                    // Просто показываем диалог
+                    // Показываем диалог успеха без статуса под кнопкой
                     showSuccessDialog(username);
                 }
             } catch (Exception ex) {
@@ -700,24 +679,26 @@ public class RegistrationFrame extends JFrame {
     }
 
     private void showStatus(String message, Color color) {
-        statusLabel.setText(message);
-        statusLabel.setForeground(color);
-        statusLabel.repaint();
+        if (statusLabel != null) {
+            statusLabel.setText(message);
+            statusLabel.setForeground(color);
+            statusLabel.setVisible(true);
+
+            // Если сообщение пустое, скрываем метку
+            if (message == null || message.trim().isEmpty()) {
+                statusLabel.setVisible(false);
+            }
+        }
     }
 
-    private void startLoadingAnimation() {
-        statusLabel.setText("Отправка данных на сервер");
-        statusLabel.setForeground(new Color(155, 89, 182));
-    }
-
-    private void stopLoadingAnimation() {
-        // Ничего не делаем
-    }
+    // УБРАЛ методы которые больше не нужны
+    // private void startLoadingAnimation() { ... }
+    // private void stopLoadingAnimation() { ... }
 
     // Красивое окно успешной регистрации с большой кнопкой внизу
     private void showSuccessDialog(String username) {
         // Очищаем статус под кнопкой
-        showStatus(" ", Color.BLACK);
+        showStatus("", Color.BLACK);
 
         JDialog successDialog = new JDialog(this, "", true);
         successDialog.setUndecorated(true);

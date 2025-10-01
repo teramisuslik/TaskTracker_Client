@@ -40,21 +40,32 @@ public class AdminApplicationFrame extends JFrame {
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // Основная панель с BorderLayout
+        // Создаем слоеную панель для фона и контента
+        JLayeredPane layeredPane = new JLayeredPane();
+        layeredPane.setLayout(new OverlayLayout(layeredPane));
+
+        // Фоновый градиент
+        BackgroundPanel backgroundPanel = new BackgroundPanel();
+        backgroundPanel.setBounds(0, 0, 1200, 800);
+
+        // Основной контент
         JPanel contentPane = new JPanel(new BorderLayout());
+        contentPane.setOpaque(false);
 
         // Панель для верхней части
-        JPanel topPanel = createTopPanel(username);
+        JPanel topPanel = createModernTopPanel(username);
 
         // Центральная панель с CardLayout для переключения между разными видами
         cardLayout = new CardLayout();
         centerPanel = new JPanel(cardLayout);
+        centerPanel.setOpaque(false);
 
         // Панель приветствия
-        JPanel welcomePanel = createWelcomePanel();
+        JPanel welcomePanel = createModernWelcomePanel();
 
         // Панель для всех задач
         JPanel allTasksPanel = new JPanel(new BorderLayout());
+        allTasksPanel.setOpaque(false);
 
         centerPanel.add(welcomePanel, "welcome");
         centerPanel.add(allTasksPanel, "alltasks");
@@ -63,7 +74,11 @@ public class AdminApplicationFrame extends JFrame {
         contentPane.add(topPanel, BorderLayout.NORTH);
         contentPane.add(centerPanel, BorderLayout.CENTER);
 
-        add(contentPane);
+        // Добавляем все в слои
+        layeredPane.add(backgroundPanel, Integer.valueOf(0));
+        layeredPane.add(contentPane, Integer.valueOf(1));
+
+        setContentPane(layeredPane);
 
         // Инициализация системы уведомлений
         initializeNotificationSystem();
@@ -176,96 +191,6 @@ public class AdminApplicationFrame extends JFrame {
         return logoutButton;
     }
 
-    private void showLogoutConfirmationDialog() {
-        JDialog confirmDialog = new JDialog(this, "Подтверждение выхода", true);
-        confirmDialog.setSize(400, 250);
-        confirmDialog.setLocationRelativeTo(this);
-        confirmDialog.setResizable(false);
-        confirmDialog.setLayout(new BorderLayout());
-
-        JPanel contentPanel = new JPanel();
-        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-        contentPanel.setBackground(new Color(255, 255, 255));
-        contentPanel.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
-
-        // Иконка вопроса
-        JLabel iconLabel = new JLabel("?", SwingConstants.CENTER);
-        iconLabel.setFont(new Font("Arial", Font.BOLD, 48));
-        iconLabel.setForeground(new Color(241, 196, 15));
-        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        // Заголовок
-        JLabel titleLabel = new JLabel("Подтверждение выхода", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 18));
-        titleLabel.setForeground(new Color(44, 62, 80));
-        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        // Сообщение
-        JLabel messageLabel = new JLabel("<html><center>Вы уверены, что хотите выйти из системы?</center></html>", SwingConstants.CENTER);
-        messageLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-        messageLabel.setForeground(new Color(127, 140, 141));
-        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        // Панель кнопок
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
-        buttonPanel.setBackground(new Color(255, 255, 255));
-
-        // Кнопка Да
-        JButton yesButton = new JButton("Да, выйти");
-        yesButton.setFont(new Font("Arial", Font.BOLD, 12));
-        yesButton.setForeground(Color.WHITE);
-        yesButton.setBackground(new Color(220, 53, 69));
-        yesButton.setBorder(BorderFactory.createEmptyBorder(8, 20, 8, 20));
-        yesButton.setFocusPainted(false);
-        yesButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
-        // Кнопка Нет
-        JButton noButton = new JButton("Нет, остаться");
-        noButton.setFont(new Font("Arial", Font.BOLD, 12));
-        noButton.setForeground(Color.WHITE);
-        noButton.setBackground(new Color(52, 152, 219));
-        noButton.setBorder(BorderFactory.createEmptyBorder(8, 20, 8, 20));
-        noButton.setFocusPainted(false);
-        noButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
-        yesButton.addActionListener(e -> {
-            confirmDialog.dispose();
-            performLogout();
-        });
-
-        noButton.addActionListener(e -> confirmDialog.dispose());
-
-        buttonPanel.add(noButton);
-        buttonPanel.add(yesButton);
-
-        contentPanel.add(iconLabel);
-        contentPanel.add(Box.createVerticalStrut(10));
-        contentPanel.add(titleLabel);
-        contentPanel.add(Box.createVerticalStrut(10));
-        contentPanel.add(messageLabel);
-        contentPanel.add(Box.createVerticalStrut(20));
-        contentPanel.add(buttonPanel);
-
-        confirmDialog.add(contentPanel, BorderLayout.CENTER);
-        confirmDialog.pack();
-        confirmDialog.setLocationRelativeTo(this);
-        confirmDialog.setVisible(true);
-    }
-
-    private void performLogout() {
-        LoginFrame.clearToken();
-        dispose();
-        SwingUtilities.invokeLater(() -> new LoginFrame().setVisible(true));
-    }
-
-    private void createNewTask() {
-        // Создаем диалог как модальный
-        AssignTaskDialog dialog = new AssignTaskDialog(this, authToken);
-        dialog.setLocationRelativeTo(this);
-        dialog.setVisible(true);
-        refreshAllData();
-    }
-
     private JPanel createTopPanel(String username) {
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setBackground(new Color(245, 245, 245));
@@ -365,177 +290,6 @@ public class AdminApplicationFrame extends JFrame {
 
         welcomePanel.add(contentPanel, BorderLayout.CENTER);
         return welcomePanel;
-    }
-
-    private JPanel createAdminStatsPanel() {
-        JPanel statsPanel = new JPanel();
-        statsPanel.setLayout(new BoxLayout(statsPanel, BoxLayout.Y_AXIS));
-        statsPanel.setBackground(new Color(248, 249, 250));
-
-        JLabel statsTitle = new JLabel("Общая статистика системы", SwingConstants.CENTER);
-        statsTitle.setFont(new Font("Arial", Font.BOLD, 24));
-        statsTitle.setForeground(new Color(33, 37, 41));
-        statsTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JPanel cardsContainer = new JPanel();
-        cardsContainer.setLayout(new GridLayout(1, 4, 20, 0));
-        cardsContainer.setBackground(new Color(248, 249, 250));
-        cardsContainer.setMaximumSize(new Dimension(1000, 190));
-        cardsContainer.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        // Заглушки для статистики - в реальной системе здесь будут реальные данные
-        cardsContainer.add(createStatCard("Всего задач", "0", new Color(52, 152, 219), "📋"));
-        cardsContainer.add(createStatCard("Активных", "0", new Color(241, 196, 15), "⏳"));
-        cardsContainer.add(createStatCard("Завершено", "0", new Color(46, 204, 113), "✅"));
-        cardsContainer.add(createStatCard("Пользователей", "0", new Color(155, 89, 182), "👥"));
-
-        statsPanel.add(statsTitle);
-        statsPanel.add(Box.createVerticalStrut(20));
-        statsPanel.add(cardsContainer);
-
-        return statsPanel;
-    }
-
-    private JPanel createStatCard(String title, String value, Color color, String icon) {
-        JPanel card = new JPanel();
-        card.setLayout(new BorderLayout());
-        card.setBackground(Color.WHITE);
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(color.brighter(), 2),
-                BorderFactory.createEmptyBorder(20, 15, 20, 15)
-        ));
-        card.setPreferredSize(new Dimension(200, 170));
-        card.setMaximumSize(new Dimension(200, 150));
-
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        topPanel.setBackground(Color.WHITE);
-        topPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
-
-        JLabel iconLabel = new JLabel(icon);
-        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 24));
-        iconLabel.setForeground(color);
-        topPanel.add(iconLabel);
-
-        JLabel valueLabel = new JLabel(value);
-        valueLabel.setFont(new Font("Arial", Font.BOLD, 36));
-        valueLabel.setForeground(color);
-        valueLabel.setHorizontalAlignment(SwingConstants.CENTER);
-
-        JLabel titleLabel = new JLabel(title);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
-        titleLabel.setForeground(new Color(108, 117, 125));
-        titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
-
-        card.add(topPanel, BorderLayout.NORTH);
-        card.add(valueLabel, BorderLayout.CENTER);
-        card.add(titleLabel, BorderLayout.SOUTH);
-
-        return card;
-    }
-
-    private void showAllTasks() {
-        centerPanel.removeAll();
-        JPanel allTasksPanel = loadAllTasksPanel();
-        centerPanel.add(allTasksPanel, "alltasks");
-        cardLayout.show(centerPanel, "alltasks");
-        centerPanel.revalidate();
-        centerPanel.repaint();
-    }
-
-    private JPanel loadAllTasksPanel() {
-        JPanel allTasksPanel = new JPanel(new BorderLayout());
-        allTasksPanel.setBackground(Color.WHITE);
-        allTasksPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 20, 20));
-
-        JLabel titleLabel = new JLabel("Все задачи системы", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
-        titleLabel.setForeground(new Color(44, 62, 80));
-        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
-
-        // Создаем панель фильтров
-        JPanel filtersPanel = createAdminFiltersPanel();
-        allTasksPanel.add(filtersPanel, BorderLayout.NORTH);
-
-        JPanel loadingPanel = new JPanel(new BorderLayout());
-        loadingPanel.setBackground(Color.WHITE);
-        JLabel loadingLabel = new JLabel("Загрузка всех задач системы...", SwingConstants.CENTER);
-        loadingLabel.setFont(new Font("Arial", Font.ITALIC, 16));
-        loadingLabel.setForeground(Color.GRAY);
-        loadingPanel.add(loadingLabel, BorderLayout.CENTER);
-
-        allTasksPanel.add(titleLabel, BorderLayout.NORTH);
-        allTasksPanel.add(loadingPanel, BorderLayout.CENTER);
-        loadAllTasksFromServer(allTasksPanel, loadingPanel);
-
-        return allTasksPanel;
-    }
-
-    private JPanel createAdminFiltersPanel() {
-        JPanel filtersPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 10));
-        filtersPanel.setBackground(new Color(248, 249, 250));
-        filtersPanel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(220, 220, 220)),
-                BorderFactory.createEmptyBorder(15, 20, 15, 20)
-        ));
-        filtersPanel.setPreferredSize(new Dimension(getWidth(), 80));
-
-        // Фильтр по статусу
-        JLabel statusLabel = new JLabel("Статус:");
-        statusLabel.setFont(new Font("Arial", Font.BOLD, 12));
-        statusLabel.setForeground(new Color(44, 62, 80));
-
-        String[] statusOptions = {"Все статусы", "НЕ_НАЧАТА", "В_РАБОТЕ", "ЗАВЕРШЕНА", "НА_ДОРАБОТКЕ"};
-        adminStatusFilter = new JComboBox<>(statusOptions);
-        styleAdminComboBox(adminStatusFilter);
-        adminStatusFilter.setPreferredSize(new Dimension(140, 30));
-
-        // Фильтр по важности
-        JLabel importanceLabel = new JLabel("Важность:");
-        importanceLabel.setFont(new Font("Arial", Font.BOLD, 12));
-        importanceLabel.setForeground(new Color(44, 62, 80));
-
-        String[] importanceOptions = {"Все приоритеты", "СРОЧНАЯ", "НАДО_ПОТОРОПИТЬСЯ", "МОЖЕТ_ПОДОЖДАТЬ"};
-        adminImportanceFilter = new JComboBox<>(importanceOptions);
-        styleAdminComboBox(adminImportanceFilter);
-        adminImportanceFilter.setPreferredSize(new Dimension(140, 30));
-
-        // Сортировка по дедлайну
-        JLabel sortLabel = new JLabel("Сортировка:");
-        sortLabel.setFont(new Font("Arial", Font.BOLD, 12));
-        sortLabel.setForeground(new Color(44, 62, 80));
-
-        String[] sortOptions = {"Без сортировки", "Дедлайн ↑", "Дедлайн ↓"};
-        adminSortFilter = new JComboBox<>(sortOptions);
-        styleAdminComboBox(adminSortFilter);
-        adminSortFilter.setPreferredSize(new Dimension(150, 30));
-
-        // Кнопки
-        adminApplyFiltersButton = new JButton("Применить");
-        adminResetFiltersButton = new JButton("Сбросить");
-
-        styleAdminFilterButton(adminApplyFiltersButton, new Color(52, 152, 219));
-        styleAdminFilterButton(adminResetFiltersButton, new Color(108, 117, 125));
-
-        adminApplyFiltersButton.setPreferredSize(new Dimension(100, 30));
-        adminResetFiltersButton.setPreferredSize(new Dimension(90, 30));
-
-        adminApplyFiltersButton.addActionListener(e -> applyAdminFilters());
-        adminResetFiltersButton.addActionListener(e -> resetAdminFilters());
-
-        // Добавляем компоненты на панель
-        filtersPanel.add(statusLabel);
-        filtersPanel.add(adminStatusFilter);
-        filtersPanel.add(Box.createHorizontalStrut(10));
-        filtersPanel.add(importanceLabel);
-        filtersPanel.add(adminImportanceFilter);
-        filtersPanel.add(Box.createHorizontalStrut(10));
-        filtersPanel.add(sortLabel);
-        filtersPanel.add(adminSortFilter);
-        filtersPanel.add(Box.createHorizontalStrut(20));
-        filtersPanel.add(adminApplyFiltersButton);
-        filtersPanel.add(adminResetFiltersButton);
-
-        return filtersPanel;
     }
 
     private void styleAdminComboBox(JComboBox<String> comboBox) {
@@ -1331,20 +1085,6 @@ public class AdminApplicationFrame extends JFrame {
         }
     }
 
-    private void showDashboard() {
-        centerPanel.removeAll();
-        JPanel welcomePanel = createWelcomePanel();
-        centerPanel.add(welcomePanel, "welcome");
-        cardLayout.show(centerPanel, "welcome");
-        centerPanel.revalidate();
-        centerPanel.repaint();
-
-        // Загружаем статистику после показа дашборда
-        SwingUtilities.invokeLater(() -> {
-            loadAdminStatistics();
-        });
-    }
-
     private List<User> getAllUsersWithTasks() {
         try {
             String url = "http://localhost:8080/allusers";
@@ -1618,54 +1358,6 @@ public class AdminApplicationFrame extends JFrame {
         }
     }
 
-    private void loadAllTasksFromServer(JPanel allTasksPanel, JPanel loadingPanel) {
-        new Thread(() -> {
-            try {
-                List<User> users = getAllUsersWithTasks(); // Это использует оригинальный парсинг
-                SwingUtilities.invokeLater(() -> {
-                    loadingPanel.removeAll();
-                    allTasksPanel.removeAll();
-                    allTasksPanel.setLayout(new BorderLayout());
-
-                    JLabel titleLabel = new JLabel("Все задачи системы", SwingConstants.CENTER);
-                    titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
-                    titleLabel.setForeground(new Color(44, 62, 80));
-                    titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-                    allTasksPanel.add(titleLabel, BorderLayout.NORTH);
-
-                    // Создаем панель фильтров
-                    JPanel filtersPanel = createAdminFiltersPanel();
-                    allTasksPanel.add(filtersPanel, BorderLayout.NORTH);
-
-                    if (users != null && !users.isEmpty()) {
-                        // Сохраняем оригинальный список всех задач
-                        originalAllAdminTasks = new ArrayList<>();
-                        for (User user : users) {
-                            if (user.getTasks() != null) {
-                                originalAllAdminTasks.addAll(user.getTasks());
-                            }
-                        }
-
-                        allAdminTasks = new ArrayList<>(originalAllAdminTasks);
-                        System.out.println("DEBUG: Loaded " + originalAllAdminTasks.size() + " tasks for admin");
-                        displayAllAdminTasks(allTasksPanel, users);
-                    } else {
-                        showNoTasksMessage(allTasksPanel);
-                        originalAllAdminTasks = new ArrayList<>();
-                        allAdminTasks = new ArrayList<>();
-                    }
-                    allTasksPanel.revalidate();
-                    allTasksPanel.repaint();
-                });
-            } catch (Exception e) {
-                SwingUtilities.invokeLater(() -> {
-                    showErrorPanel(allTasksPanel, "Ошибка загрузки: " + e.getMessage());
-                    allTasksPanel.revalidate();
-                    allTasksPanel.repaint();
-                });
-            }
-        }).start();
-    }
 
     private void showTaskComments(Task task) {
         JDialog commentsDialog = new JDialog(this, "Комментарии к задаче", true);
@@ -2550,137 +2242,7 @@ public class AdminApplicationFrame extends JFrame {
     // Методы для уведомлений
     private JDialog loadingDialog;
 
-    private void showUserManagement() {
-        JDialog userManagementDialog = new JDialog(this, "Управление пользователями", true);
-        userManagementDialog.setSize(1200, 800);
-        userManagementDialog.setLocationRelativeTo(this);
-        userManagementDialog.setLayout(new BorderLayout());
-        userManagementDialog.setResizable(true);
 
-        // Основная панель
-        JPanel mainPanel = new JPanel(new BorderLayout());
-        mainPanel.setBackground(Color.WHITE);
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-
-        // Заголовок
-        JPanel headerPanel = createUserManagementHeader();
-
-        // Панель с пользователями и задачами
-        JSplitPane splitPane = createUserManagementSplitPane();
-
-        // Панель действий
-        JPanel actionPanel = createUserManagementActionPanel(userManagementDialog);
-
-        mainPanel.add(headerPanel, BorderLayout.NORTH);
-        mainPanel.add(splitPane, BorderLayout.CENTER);
-        mainPanel.add(actionPanel, BorderLayout.SOUTH);
-
-        userManagementDialog.add(mainPanel, BorderLayout.CENTER);
-        userManagementDialog.setVisible(true);
-    }
-
-    private JPanel createUserManagementHeader() {
-        JPanel headerPanel = new JPanel();
-        headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.Y_AXIS));
-        headerPanel.setBackground(Color.WHITE);
-        headerPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
-
-        JLabel iconLabel = new JLabel("👥", SwingConstants.CENTER);
-        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
-        iconLabel.setForeground(new Color(155, 89, 182));
-        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JLabel titleLabel = new JLabel("Управление пользователями", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
-        titleLabel.setForeground(new Color(44, 62, 80));
-        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JLabel subtitleLabel = new JLabel("Управление пользователями и их задачами", SwingConstants.CENTER);
-        subtitleLabel.setFont(new Font("Arial", Font.PLAIN, 14));
-        subtitleLabel.setForeground(new Color(127, 140, 141));
-        subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        headerPanel.add(iconLabel);
-        headerPanel.add(Box.createVerticalStrut(10));
-        headerPanel.add(titleLabel);
-        headerPanel.add(Box.createVerticalStrut(5));
-        headerPanel.add(subtitleLabel);
-
-        return headerPanel;
-    }
-
-    private JSplitPane createUserManagementSplitPane() {
-        // Панель пользователей
-        JPanel usersPanel = new JPanel(new BorderLayout());
-        usersPanel.setBackground(Color.WHITE);
-        usersPanel.setBorder(BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200)),
-                "Пользователи"
-        ));
-
-        DefaultListModel<String> usersListModel = new DefaultListModel<>();
-        JList<String> usersList = new JList<>(usersListModel);
-        usersList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        usersList.setFont(new Font("Arial", Font.PLAIN, 12));
-        usersList.setBackground(new Color(248, 249, 250));
-
-        JScrollPane usersScrollPane = new JScrollPane(usersList);
-        usersPanel.add(usersScrollPane, BorderLayout.CENTER);
-
-        // Панель задач выбранного пользователя
-        JPanel tasksPanel = new JPanel(new BorderLayout());
-        tasksPanel.setBackground(Color.WHITE);
-        tasksPanel.setBorder(BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200)),
-                "Задачи пользователя"
-        ));
-
-        // Используем таблицу вместо списка для задач
-        String[] columnNames = {"Название", "Статус", "Важность", "Дедлайн"};
-        DefaultTableModel tasksTableModel = new DefaultTableModel(columnNames, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-
-        JTable tasksTable = new JTable(tasksTableModel);
-        tasksTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        tasksTable.setFont(new Font("Arial", Font.PLAIN, 12));
-        tasksTable.setBackground(new Color(248, 249, 250));
-        tasksTable.setRowHeight(25);
-
-        // Добавляем кастомный рендерер для цветов дедлайна
-        tasksTable.setDefaultRenderer(Object.class, new DeadlineTableCellRenderer());
-
-        // Настраиваем ширину колонок
-        tasksTable.getColumnModel().getColumn(0).setPreferredWidth(200); // Название
-        tasksTable.getColumnModel().getColumn(1).setPreferredWidth(120); // Статус
-        tasksTable.getColumnModel().getColumn(2).setPreferredWidth(120); // Важность
-        tasksTable.getColumnModel().getColumn(3).setPreferredWidth(100); // Дедлайн
-
-        JScrollPane tasksScrollPane = new JScrollPane(tasksTable);
-        tasksPanel.add(tasksScrollPane, BorderLayout.CENTER);
-
-        // Загрузка пользователей
-        loadUsers(usersListModel, tasksTableModel, tasksTable);
-
-        // Обработчик выбора пользователя
-        usersList.addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                String selectedUser = usersList.getSelectedValue();
-                if (selectedUser != null && !selectedUser.startsWith("Пользователи не найдены") && !selectedUser.startsWith("Ошибка")) {
-                    loadUserTasks(selectedUser, tasksTableModel);
-                }
-            }
-        });
-
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, usersPanel, tasksPanel);
-        splitPane.setDividerLocation(300);
-        splitPane.setResizeWeight(0.3);
-
-        return splitPane;
-    }
     private void performDeleteUser(String username, JDialog parentDialog) {
         showLoadingDialog("Удаление пользователя " + username + "...");
 
@@ -2956,38 +2518,6 @@ public class AdminApplicationFrame extends JFrame {
         }
     }
 
-    private JPanel createUserManagementActionPanel(JDialog parentDialog) {
-        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 10));
-        actionPanel.setBackground(Color.WHITE);
-        actionPanel.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
-
-        JButton deleteUserButton = new JButton("Удалить пользователя");
-        JButton deleteTaskButton = new JButton("Удалить задачу");
-        JButton reassignTaskButton = new JButton("Переназначить задачу");
-        JButton editTaskButton = new JButton("Редактировать задачу");
-        JButton closeButton = new JButton("Закрыть");
-
-        styleManagementButton(deleteUserButton, new Color(231, 76, 60));
-        styleManagementButton(deleteTaskButton, new Color(231, 76, 60));
-        styleManagementButton(reassignTaskButton, new Color(52, 152, 219));
-        styleManagementButton(editTaskButton, new Color(241, 196, 15));
-        styleManagementButton(closeButton, new Color(108, 117, 125));
-
-        // Обработчики действий с передачей parentDialog
-        deleteUserButton.addActionListener(e -> deleteSelectedUser(parentDialog));
-        deleteTaskButton.addActionListener(e -> deleteSelectedTask(parentDialog));
-        reassignTaskButton.addActionListener(e -> reassignSelectedTask(parentDialog));
-        editTaskButton.addActionListener(e -> editSelectedTask(parentDialog));
-        closeButton.addActionListener(e -> parentDialog.dispose());
-
-        actionPanel.add(deleteUserButton);
-        actionPanel.add(deleteTaskButton);
-        actionPanel.add(reassignTaskButton);
-        actionPanel.add(editTaskButton);
-        actionPanel.add(closeButton);
-
-        return actionPanel;
-    }
 
     private void hideLoadingDialog() {
         SwingUtilities.invokeLater(() -> {
@@ -3059,36 +2589,6 @@ public class AdminApplicationFrame extends JFrame {
         return null;
     }
 
-    private void loadUsers(DefaultListModel<String> usersListModel, DefaultTableModel tasksTableModel, JTable tasksTable) {
-        showLoadingDialog("Загрузка пользователей...");
-
-        new Thread(() -> {
-            try {
-                List<User> users = getAllUsersWithTasks();
-                SwingUtilities.invokeLater(() -> {
-                    hideLoadingDialog();
-                    usersListModel.clear();
-                    tasksTableModel.setRowCount(0);
-
-                    if (users != null && !users.isEmpty()) {
-                        for (User user : users) {
-                            usersListModel.addElement(user.getUsername());
-                        }
-                        System.out.println("DEBUG: Loaded " + users.size() + " users");
-                    } else {
-                        usersListModel.addElement("Пользователи не найдены");
-                    }
-                });
-            } catch (Exception e) {
-                SwingUtilities.invokeLater(() -> {
-                    hideLoadingDialog();
-                    usersListModel.clear();
-                    usersListModel.addElement("Ошибка загрузки: " + e.getMessage());
-                    showErrorMessage("Ошибка загрузки пользователей: " + e.getMessage());
-                });
-            }
-        }).start();
-    }
 
     // Метод для назначения задачи пользователю (аналогично созданию новой задачи)
     private boolean assignTaskToUser(Task task, String username) {
@@ -3506,34 +3006,6 @@ public class AdminApplicationFrame extends JFrame {
                 false
         );
         infoDialog.setVisible(true);
-    }
-
-    // Обновленный метод для сообщений об успехе
-    private void showSuccessMessage(String message) {
-        JDialog successDialog = createStyledDialog(
-                "Успех",
-                message,
-                "✅",
-                new Color(46, 204, 113),
-                "ОК",
-                new Color(46, 204, 113),
-                false
-        );
-        successDialog.setVisible(true);
-    }
-
-    // Обновленный метод для сообщений об ошибках
-    private void showErrorMessage(String message) {
-        JDialog errorDialog = createStyledDialog(
-                "Ошибка",
-                message,
-                "❌",
-                new Color(231, 76, 60),
-                "Понятно",
-                new Color(231, 76, 60),
-                false
-        );
-        errorDialog.setVisible(true);
     }
 
     // Универсальный метод создания красивого диалога
@@ -3997,27 +3469,7 @@ public class AdminApplicationFrame extends JFrame {
         }
     }
 
-    // Стиль для кнопок управления
-    private void styleManagementButton(JButton button, Color color) {
-        button.setFont(new Font("Arial", Font.BOLD, 12));
-        button.setForeground(Color.WHITE);
-        button.setBackground(color);
-        button.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(color.darker(), 1),
-                BorderFactory.createEmptyBorder(8, 15, 8, 15)
-        ));
-        button.setFocusPainted(false);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
-        button.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseEntered(java.awt.event.MouseEvent evt) {
-                button.setBackground(color.darker());
-            }
-            public void mouseExited(java.awt.event.MouseEvent evt) {
-                button.setBackground(color);
-            }
-        });
-    }
 
     // Метод для стилизации спиннеров даты
     private void styleDateSpinner(JSpinner spinner) {
@@ -4292,17 +3744,6 @@ public class AdminApplicationFrame extends JFrame {
         editDialog.setVisible(true);
     }
 
-    private void initializeNotificationSystem() {
-        // Создаем менеджер уведомлений
-        notificationManager = new NotificationManager(this);
-
-        // Создаем и запускаем consumer для уведомлений
-        notificationConsumer = new AdminNotificationConsumer(notificationManager);
-        notificationConsumer.startConsuming();
-
-        System.out.println("Notification system initialized");
-    }
-
     // Добавьте метод для корректного закрытия
     @Override
     public void dispose() {
@@ -4311,18 +3752,6 @@ public class AdminApplicationFrame extends JFrame {
             notificationConsumer.stop();
         }
         super.dispose();
-    }
-
-    private void onWindowClosing() {
-        // Останавливаем consumer при закрытии окна
-        if (notificationConsumer != null) {
-            notificationConsumer.stop();
-        }
-
-        // При закрытии окна администратора возвращаемся к окну логина
-        SwingUtilities.invokeLater(() -> {
-            new LoginFrame().setVisible(true);
-        });
     }
 
     private boolean sendReworkRequestToServer(Task task, String commentText) {
@@ -4671,23 +4100,6 @@ public class AdminApplicationFrame extends JFrame {
         descriptionDialog.setVisible(true);
     }
 
-    private JPanel createAdminTableHeader() {
-        JPanel headerPanel = new JPanel(new GridLayout(1, 8, 10, 5)); // Увеличили до 8 колонок
-        headerPanel.setBackground(new Color(240, 240, 240));
-        headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
-        headerPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
-
-        String[] headers = {"Пользователь", "Название задачи", "Описание", "Статус", "Срочность", "Дедлайн", "Комментарии", "Действия"};
-        for (String header : headers) {
-            JLabel headerLabel = new JLabel(header);
-            headerLabel.setFont(new Font("Arial", Font.BOLD, 12));
-            headerLabel.setForeground(new Color(44, 62, 80));
-            headerPanel.add(headerLabel);
-        }
-
-        return headerPanel;
-    }
-
     private void addAdminTaskRow(JPanel parent, Task task, String username) {
         JPanel taskRow = new JPanel(new GridLayout(1, 8, 10, 5)); // Увеличили до 8 колонок
         taskRow.setBackground(Color.WHITE);
@@ -4800,12 +4212,983 @@ public class AdminApplicationFrame extends JFrame {
         parent.add(taskRow);
     }
 
+
+    // Класс для фоновой панели как в UserApplicationFrame
+    private class BackgroundPanel extends JPanel {
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            // Черно-фиолетовый градиент
+            GradientPaint mainGradient = new GradientPaint(0, 0, new Color(25, 25, 35),
+                    getWidth(), getHeight(), new Color(45, 30, 60));
+            g2.setPaint(mainGradient);
+            g2.fillRect(0, 0, getWidth(), getHeight());
+
+            // Декоративные элементы (пузырьки)
+            drawBubbles(g2);
+        }
+
+        private void drawBubbles(Graphics2D g2) {
+            // Фиолетовые пузырьки на заднем плане
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.08f));
+            g2.setColor(new Color(155, 89, 182));
+
+            // Большой пузырь
+            g2.fillOval(-50, -50, 200, 200);
+            g2.fillOval(getWidth() - 100, getHeight() - 150, 300, 300);
+            g2.fillOval(getWidth() - 250, 50, 150, 150);
+
+            // Дополнительные мелкие пузырьки
+            g2.fillOval(100, getHeight() - 200, 100, 100);
+            g2.fillOval(getWidth() - 150, 200, 80, 80);
+
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+        }
+    }
+
+
+
+    // Метод для создания кнопок в современном стиле
+    private JButton createModernButton(String text) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        button.setForeground(Color.WHITE);
+        button.setBackground(new Color(30, 144, 255));
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(true);
+        button.setOpaque(true);
+        button.setPreferredSize(new Dimension(180, 45));
+        button.setMaximumSize(new Dimension(180, 45));
+        button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        return button;
+    }
+
+
+
+    // Обновленные методы для диалогов (аналогично UserApplicationFrame)
+    private JDialog createStyledDialog(String title, int width, int height) {
+        JDialog dialog = new JDialog(this, title, true);
+        dialog.setSize(width, height);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new BorderLayout());
+        dialog.setResizable(false);
+
+        JPanel backgroundPanel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                GradientPaint gradient = new GradientPaint(0, 0, new Color(25, 25, 35),
+                        getWidth(), getHeight(), new Color(45, 30, 60));
+                g2.setPaint(gradient);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.08f));
+                g2.setColor(new Color(155, 89, 182));
+                g2.fillOval(-50, -50, 200, 200);
+                g2.fillOval(getWidth() - 100, getHeight() - 150, 300, 300);
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+            }
+        };
+        backgroundPanel.setLayout(new BorderLayout());
+        backgroundPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        dialog.setContentPane(backgroundPanel);
+        return dialog;
+    }
+
+    private JLabel createDialogTitle(String text) {
+        JLabel titleLabel = new JLabel(text, SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 20, 0));
+        return titleLabel;
+    }
+
+    private JLabel createDialogText(String text, int fontSize) {
+        JLabel textLabel = new JLabel(text);
+        textLabel.setFont(new Font("Segoe UI", Font.PLAIN, fontSize));
+        textLabel.setForeground(new Color(220, 220, 220));
+        return textLabel;
+    }
+
+    private JButton createDialogButton(String text, Color backgroundColor) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        button.setForeground(Color.WHITE);
+        button.setBackground(backgroundColor);
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(255, 255, 255, 100), 1),
+                BorderFactory.createEmptyBorder(12, 25, 12, 25)
+        ));
+        button.setFocusPainted(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setContentAreaFilled(true);
+
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(backgroundColor.brighter());
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(backgroundColor);
+            }
+        });
+
+        return button;
+    }
+
+    // Обновленный метод подтверждения выхода
+    private void showLogoutConfirmationDialog() {
+        JDialog confirmDialog = createStyledDialog("Подтверждение выхода", 500, 400);
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setOpaque(false);
+
+        JLabel iconLabel = new JLabel("🚪", SwingConstants.CENTER);
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
+        iconLabel.setForeground(new Color(241, 196, 15));
+        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel titleLabel = createDialogTitle("Подтверждение выхода");
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel messageLabel = createDialogText("Вы уверены, что хотите выйти из системы?", 14);
+        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
+        buttonPanel.setOpaque(false);
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(25, 0, 0, 0));
+
+        JButton yesButton = createDialogButton("Да, выйти", new Color(220, 53, 69));
+        JButton noButton = createDialogButton("Нет, остаться", new Color(108, 117, 125));
+
+        yesButton.addActionListener(e -> {
+            confirmDialog.dispose();
+            performLogout();
+        });
+        noButton.addActionListener(e -> confirmDialog.dispose());
+
+        buttonPanel.add(noButton);
+        buttonPanel.add(yesButton);
+
+        contentPanel.add(iconLabel);
+        contentPanel.add(Box.createVerticalStrut(15));
+        contentPanel.add(titleLabel);
+        contentPanel.add(Box.createVerticalStrut(15));
+        contentPanel.add(messageLabel);
+        contentPanel.add(Box.createVerticalStrut(25));
+        contentPanel.add(buttonPanel);
+
+        confirmDialog.add(contentPanel, BorderLayout.CENTER);
+        confirmDialog.getRootPane().setDefaultButton(noButton);
+        confirmDialog.setVisible(true);
+    }
+
+    // Обновленные методы для информационных сообщений
+    private void showSuccessMessage(String message) {
+        JDialog successDialog = createStyledDialog("Успех", 450, 250);
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setOpaque(false);
+
+        JLabel iconLabel = new JLabel("✅", SwingConstants.CENTER);
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
+        iconLabel.setForeground(new Color(46, 204, 113));
+        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel titleLabel = createDialogTitle("Успешно!");
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel messageLabel = createDialogText(message, 14);
+        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JButton okButton = createDialogButton("OK", new Color(46, 204, 113));
+        okButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        okButton.addActionListener(e -> successDialog.dispose());
+
+        contentPanel.add(iconLabel);
+        contentPanel.add(Box.createVerticalStrut(15));
+        contentPanel.add(titleLabel);
+        contentPanel.add(Box.createVerticalStrut(10));
+        contentPanel.add(messageLabel);
+        contentPanel.add(Box.createVerticalStrut(25));
+        contentPanel.add(okButton);
+
+        successDialog.add(contentPanel, BorderLayout.CENTER);
+        successDialog.getRootPane().setDefaultButton(okButton);
+        successDialog.setVisible(true);
+    }
+
+    private void showErrorMessage(String message) {
+        JDialog errorDialog = createStyledDialog("Ошибка", 450, 250);
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setOpaque(false);
+
+        JLabel iconLabel = new JLabel("❌", SwingConstants.CENTER);
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
+        iconLabel.setForeground(new Color(231, 76, 60));
+        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel titleLabel = createDialogTitle("Ошибка");
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel messageLabel = createDialogText(message, 14);
+        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JButton okButton = createDialogButton("OK", new Color(231, 76, 60));
+        okButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        okButton.addActionListener(e -> errorDialog.dispose());
+
+        contentPanel.add(iconLabel);
+        contentPanel.add(Box.createVerticalStrut(15));
+        contentPanel.add(titleLabel);
+        contentPanel.add(Box.createVerticalStrut(10));
+        contentPanel.add(messageLabel);
+        contentPanel.add(Box.createVerticalStrut(25));
+        contentPanel.add(okButton);
+
+        errorDialog.add(contentPanel, BorderLayout.CENTER);
+        errorDialog.getRootPane().setDefaultButton(okButton);
+        errorDialog.setVisible(true);
+    }
+
+
+    private JButton createModernFilterButton(String text, Color color) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        button.setForeground(Color.WHITE);
+        button.setBackground(color);
+        button.setBorder(BorderFactory.createEmptyBorder(8, 15, 8, 15));
+        button.setFocusPainted(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setPreferredSize(new Dimension(100, 30));
+
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(color.darker());
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(color);
+            }
+        });
+
+        return button;
+    }
+
+
+
+    private void performLogout() {
+        LoginFrame.clearToken();
+        dispose();
+        SwingUtilities.invokeLater(() -> new LoginFrame().setVisible(true));
+    }
+
+    private void showDashboard() {
+        centerPanel.removeAll();
+        JPanel welcomePanel = createModernWelcomePanel();
+        centerPanel.add(welcomePanel, "welcome");
+        cardLayout.show(centerPanel, "welcome");
+        centerPanel.revalidate();
+        centerPanel.repaint();
+
+        SwingUtilities.invokeLater(() -> {
+            loadAdminStatistics();
+        });
+    }
+
+    private void showAllTasks() {
+        centerPanel.removeAll();
+        JPanel allTasksPanel = loadAllTasksPanel();
+        centerPanel.add(allTasksPanel, "alltasks");
+        cardLayout.show(centerPanel, "alltasks");
+        centerPanel.revalidate();
+        centerPanel.repaint();
+    }
+
+    private void initializeNotificationSystem() {
+        notificationManager = new NotificationManager(this);
+        notificationConsumer = new AdminNotificationConsumer(notificationManager);
+        notificationConsumer.startConsuming();
+        System.out.println("Notification system initialized");
+    }
+
+    private void onWindowClosing() {
+        if (notificationConsumer != null) {
+            notificationConsumer.stop();
+        }
+        SwingUtilities.invokeLater(() -> {
+            new LoginFrame().setVisible(true);
+        });
+    }
+
+    // Обновленный метод для создания кнопок с возможностью указания ширины
+    private JButton createModernButton(String text, int width) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        button.setForeground(Color.WHITE);
+        button.setBackground(new Color(30, 144, 255));
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(true);
+        button.setOpaque(true);
+        button.setPreferredSize(new Dimension(width, 45));
+        button.setMaximumSize(new Dimension(width, 45));
+        button.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+
+        // Добавляем перенос текста для длинных надписей
+        button.addHierarchyListener(e -> {
+            if (button.getText().length() > 15) {
+                button.setText("<html><center>" + text + "</center></html>");
+            }
+        });
+
+        return button;
+    }
+
+
+    // Альтернативное решение для очень длинного текста кнопки
+    private JButton createWideModernButton(String text) {
+        JButton button = new JButton();
+        button.setFont(new Font("Segoe UI", Font.BOLD, 12)); // Уменьшаем шрифт для длинного текста
+        button.setForeground(Color.WHITE);
+        button.setBackground(new Color(30, 144, 255));
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(true);
+        button.setOpaque(true);
+        button.setPreferredSize(new Dimension(280, 45)); // Еще больше ширина
+        button.setMaximumSize(new Dimension(280, 45));
+        button.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Используем HTML для переноса текста
+        button.setText("<html><center>" + text + "</center></html>");
+
+        return button;
+    }
+
+    private JButton createWideButton(String text, int width) {
+        JButton button = new JButton();
+
+        // Используем HTML для правильного отображения длинного текста
+        String buttonText = "<html><div style='text-align:center; padding:5px;'>" + text + "</div></html>";
+        button.setText(buttonText);
+
+        button.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        button.setForeground(Color.WHITE);
+        button.setBackground(new Color(30, 144, 255));
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(true);
+        button.setOpaque(true);
+        button.setPreferredSize(new Dimension(width, 40));
+        button.setMinimumSize(new Dimension(width, 40));
+        button.setMaximumSize(new Dimension(width, 40));
+
+        // Убираем стандартные отступы, так как используем HTML-отступы
+        button.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+
+        // Эффект при наведении
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(button.getBackground().darker());
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(new Color(30, 144, 255));
+            }
+        });
+
+        return button;
+    }
+
+    // НОВЫЙ МЕТОД ДЛЯ КНОПОК НАВИГАЦИИ
+    private JButton createNavButton(String text) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        button.setForeground(Color.WHITE);
+        button.setBackground(new Color(30, 144, 255));
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(255, 255, 255, 100), 1),
+                BorderFactory.createEmptyBorder(8, 12, 8, 12)
+        ));
+        button.setContentAreaFilled(true);
+        button.setOpaque(true);
+
+        // Для длинного текста используем HTML с переносом
+        if (text.length() > 15) {
+            button.setText("<html><center>" + text + "</center></html>");
+            button.setPreferredSize(new Dimension(180, 40));
+        } else {
+            button.setPreferredSize(new Dimension(120, 40));
+        }
+
+        button.setMaximumSize(button.getPreferredSize());
+        button.setMinimumSize(button.getPreferredSize());
+
+        // Эффект при наведении
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(button.getBackground().brighter());
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                if (button.getText().contains("Выйти")) {
+                    button.setBackground(new Color(220, 53, 69));
+                } else {
+                    button.setBackground(new Color(30, 144, 255));
+                }
+            }
+        });
+
+        return button;
+    }
+
+
+    // ВАРИАНТ С ПОЛНЫМ ТЕКСТОМ ДЛЯ КНОПКИ
+    private JButton createWideSimpleButton(String text) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 11)); // Чуть меньше шрифт
+        button.setForeground(Color.WHITE);
+        button.setBackground(new Color(30, 144, 255));
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(true);
+        button.setOpaque(true);
+        button.setPreferredSize(new Dimension(180, 40));
+        return button;
+    }
+
+
+
+
+    private JPanel createModernTopPanel(String username) {
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.setOpaque(false);
+        topPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+
+        // Левая панель с информацией
+        JPanel leftPanel = new JPanel(new BorderLayout());
+        leftPanel.setOpaque(false);
+
+        // Панель информации
+        JPanel infoPanel = new JPanel();
+        infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
+        infoPanel.setOpaque(false);
+
+        JLabel welcomeLabel = new JLabel("Панель администратора");
+        welcomeLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        welcomeLabel.setForeground(Color.WHITE);
+        welcomeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel userInfoLabel = new JLabel("Вы вошли как: " + username + " (ADMIN)");
+        userInfoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        userInfoLabel.setForeground(new Color(200, 200, 200));
+        userInfoLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        infoPanel.add(welcomeLabel);
+        infoPanel.add(Box.createVerticalStrut(5));
+        infoPanel.add(userInfoLabel);
+
+        // Панель кнопок
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        buttonPanel.setOpaque(false);
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
+
+        // Кнопки с переносом текста для длинных названий
+        JButton dashboardButton = createSimpleButton("Главная");
+        JButton allTasksButton = createSimpleButton("Все задачи");
+        JButton manageUsersButton = createMultiLineButton("Управление<br>пользователями"); // Перенос текста
+        JButton createTaskButton = createSimpleButton("Создать задачу");
+
+        dashboardButton.addActionListener(e -> showDashboard());
+        allTasksButton.addActionListener(e -> showAllTasks());
+        manageUsersButton.addActionListener(e -> showUserManagement());
+        createTaskButton.addActionListener(e -> createNewTask());
+
+        buttonPanel.add(dashboardButton);
+        buttonPanel.add(allTasksButton);
+        buttonPanel.add(manageUsersButton);
+        buttonPanel.add(createTaskButton);
+
+        leftPanel.add(infoPanel, BorderLayout.NORTH);
+        leftPanel.add(buttonPanel, BorderLayout.CENTER);
+
+        // Правая панель с кнопкой выхода
+        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        rightPanel.setOpaque(false);
+
+        JButton logoutButton = createSimpleButton("Выйти");
+        logoutButton.setBackground(new Color(220, 53, 69));
+        logoutButton.addActionListener(e -> showLogoutConfirmationDialog());
+
+        rightPanel.add(logoutButton);
+
+        topPanel.add(leftPanel, BorderLayout.CENTER);
+        topPanel.add(rightPanel, BorderLayout.EAST);
+
+        return topPanel;
+    }
+
+    // Кнопка с переносом текста
+    private JButton createMultiLineButton(String htmlText) {
+        JButton button = new JButton();
+        button.setText("<html><center>" + htmlText + "</center></html>");
+        button.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        button.setForeground(Color.WHITE);
+        button.setBackground(new Color(30, 144, 255));
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(true);
+        button.setOpaque(true);
+        button.setPreferredSize(new Dimension(140, 50)); // Выше для двух строк
+        button.setVerticalTextPosition(SwingConstants.CENTER);
+        button.setHorizontalTextPosition(SwingConstants.CENTER);
+
+        return button;
+    }
+
+    // Обычная кнопка
+    private JButton createSimpleButton(String text) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        button.setForeground(Color.WHITE);
+        button.setBackground(new Color(30, 144, 255));
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(true);
+        button.setOpaque(true);
+        button.setPreferredSize(new Dimension(120, 40));
+
+        return button;
+    }
+
+    // КАРТОЧКИ КАК У ПОЛЬЗОВАТЕЛЕЙ - ТОЧНАЯ КОПИЯ
+    private JPanel createModernStatCard(String title, String value, Color color) {
+        JPanel card = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                // Полупрозрачный фон карточки как у пользователя
+                g2.setColor(new Color(255, 255, 255, 20));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+
+                // Градиентная рамка как у пользователя
+                GradientPaint gradient = new GradientPaint(0, 0, color, getWidth(), getHeight(),
+                        new Color(color.getRed(), color.getGreen(), color.getBlue(), 150));
+                g2.setPaint(gradient);
+                g2.setStroke(new BasicStroke(2));
+                g2.drawRoundRect(1, 1, getWidth()-3, getHeight()-3, 20, 20);
+            }
+        };
+
+        card.setLayout(new BorderLayout());
+        card.setPreferredSize(new Dimension(200, 120)); // Размер как у пользователя
+        card.setMaximumSize(new Dimension(200, 120));
+        card.setBorder(BorderFactory.createEmptyBorder(20, 15, 20, 15));
+
+        // Заголовок как у пользователя
+        JLabel titleLabel = new JLabel(title, SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        titleLabel.setForeground(new Color(220, 220, 220));
+
+        // Значение как у пользователя
+        JLabel valueLabel = new JLabel(value, SwingConstants.CENTER);
+        valueLabel.setFont(new Font("Segoe UI", Font.BOLD, 32));
+        valueLabel.setForeground(Color.WHITE);
+
+        card.add(titleLabel, BorderLayout.NORTH);
+        card.add(valueLabel, BorderLayout.CENTER);
+
+        // Эффекты при наведении как у пользователя
+        card.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                card.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                card.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+            }
+        });
+
+        return card;
+    }
+
+    // ПАНЕЛЬ СТАТИСТИКИ КАК У ПОЛЬЗОВАТЕЛЕЙ
+    private JPanel createModernStatsPanel() {
+        JPanel statsPanel = new JPanel();
+        statsPanel.setLayout(new BoxLayout(statsPanel, BoxLayout.Y_AXIS));
+        statsPanel.setOpaque(false);
+        statsPanel.setBorder(BorderFactory.createEmptyBorder(30, 0, 30, 0));
+
+        JLabel statsTitle = new JLabel("Общая статистика системы", SwingConstants.CENTER);
+        statsTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        statsTitle.setForeground(Color.WHITE);
+        statsTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JPanel cardsContainer = new JPanel(new GridLayout(1, 4, 20, 0));
+        cardsContainer.setOpaque(false);
+        cardsContainer.setMaximumSize(new Dimension(900, 140));
+        cardsContainer.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Карточки как у пользователя
+        cardsContainer.add(createModernStatCard("Всего задач", "0", new Color(70, 130, 180)));
+        cardsContainer.add(createModernStatCard("Активных", "0", new Color(255, 165, 0)));
+        cardsContainer.add(createModernStatCard("Завершено", "0", new Color(50, 205, 50)));
+        cardsContainer.add(createModernStatCard("Пользователей", "0", new Color(155, 89, 182)));
+
+        statsPanel.add(statsTitle);
+        statsPanel.add(Box.createVerticalStrut(30));
+        statsPanel.add(cardsContainer);
+
+        return statsPanel;
+    }
+
+    // Обновленный метод createModernWelcomePanel для использования на темном фоне
+    private JPanel createModernWelcomePanel() {
+        JPanel welcomePanel = new JPanel(new BorderLayout());
+        welcomePanel.setOpaque(false); // Прозрачный для темного градиента
+        welcomePanel.setBorder(BorderFactory.createEmptyBorder(60, 80, 60, 80));
+
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setOpaque(false);
+
+        // Заголовок как в UserApplicationFrame
+        JLabel titleLabel = new JLabel("Добро пожаловать в панель администратора!", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 32));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Описание
+        JTextArea descriptionArea = new JTextArea();
+        descriptionArea.setEditable(false);
+        descriptionArea.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        descriptionArea.setLineWrap(true);
+        descriptionArea.setWrapStyleWord(true);
+        descriptionArea.setOpaque(false);
+        descriptionArea.setForeground(new Color(220, 220, 220));
+        descriptionArea.setText("\nЗдесь вы можете управлять всеми задачами системы, создавать новые задания, " +
+                "назначать их пользователям и отслеживать прогресс выполнения. " +
+                "Используйте меню выше для навигации по разделам административной панели.\n");
+        descriptionArea.setBorder(BorderFactory.createEmptyBorder(30, 80, 40, 80));
+        descriptionArea.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Статистика
+        JPanel statsPanel = createAdminStatsPanel();
+
+        contentPanel.add(titleLabel);
+        contentPanel.add(Box.createVerticalStrut(30));
+        contentPanel.add(descriptionArea);
+        contentPanel.add(Box.createVerticalStrut(50));
+        contentPanel.add(statsPanel);
+
+        welcomePanel.add(contentPanel, BorderLayout.CENTER);
+        return welcomePanel;
+    }
+
+
+
+    private JPanel createStatCard(String title, String value, Color color, String icon) {
+        JPanel card = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                // Полупрозрачный фон карточки
+                g2.setColor(new Color(255, 255, 255, 20));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+
+                // Градиентная рамка
+                GradientPaint gradient = new GradientPaint(0, 0, color, getWidth(), getHeight(),
+                        new Color(color.getRed(), color.getGreen(), color.getBlue(), 150));
+                g2.setPaint(gradient);
+                g2.setStroke(new BasicStroke(2));
+                g2.drawRoundRect(1, 1, getWidth()-3, getHeight()-3, 20, 20);
+
+                g2.dispose();
+            }
+        };
+
+        card.setLayout(new BorderLayout());
+        card.setPreferredSize(new Dimension(200, 170));
+        card.setMaximumSize(new Dimension(200, 150));
+        card.setBorder(BorderFactory.createEmptyBorder(20, 15, 20, 15));
+        card.setOpaque(false); // Прозрачный для корректной работы custom paintComponent
+
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        topPanel.setOpaque(false); // Прозрачный
+        topPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+
+        JLabel iconLabel = new JLabel(icon);
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 24));
+        iconLabel.setForeground(color);
+        iconLabel.setOpaque(false); // Прозрачный
+
+        topPanel.add(iconLabel);
+
+        JLabel valueLabel = new JLabel(value);
+        valueLabel.setFont(new Font("Arial", Font.BOLD, 36));
+        valueLabel.setForeground(color);
+        valueLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        valueLabel.setOpaque(false); // Прозрачный
+
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        titleLabel.setForeground(new Color(108, 117, 125));
+        titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        titleLabel.setOpaque(false); // Прозрачный
+
+        card.add(topPanel, BorderLayout.NORTH);
+        card.add(valueLabel, BorderLayout.CENTER);
+        card.add(titleLabel, BorderLayout.SOUTH);
+
+        // Убрал MouseListener, чтобы избежать артефактов от изменений border/background
+
+        return card;
+    }
+
+
+
+    private JPanel createStatCard(String title, String value, Color color) {  // Убрал параметр icon, так как смайлики лишние
+        JPanel card = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                // Полупрозрачный фон карточки
+                g2.setColor(new Color(255, 255, 255, 20));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+
+                // Градиентная рамка
+                GradientPaint gradient = new GradientPaint(0, 0, color, getWidth(), getHeight(),
+                        new Color(color.getRed(), color.getGreen(), color.getBlue(), 150));
+                g2.setPaint(gradient);
+                g2.setStroke(new BasicStroke(2));
+                g2.drawRoundRect(1, 1, getWidth()-3, getHeight()-3, 20, 20);
+
+                g2.dispose();
+            }
+        };
+
+        card.setLayout(new BorderLayout());
+        card.setPreferredSize(new Dimension(200, 170));
+        card.setMaximumSize(new Dimension(200, 150));
+        card.setBorder(BorderFactory.createEmptyBorder(20, 15, 20, 15));
+        card.setOpaque(false); // Прозрачный для корректной работы custom paintComponent
+
+        // Заголовок наверху
+        JLabel titleLabel = new JLabel(title, SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        titleLabel.setForeground(new Color(108, 117, 125));
+        titleLabel.setOpaque(false); // Прозрачный
+
+        // Значение в центре
+        JLabel valueLabel = new JLabel(value, SwingConstants.CENTER);
+        valueLabel.setFont(new Font("Arial", Font.BOLD, 36));
+        valueLabel.setForeground(color);
+        valueLabel.setOpaque(false); // Прозрачный
+
+        card.add(titleLabel, BorderLayout.NORTH);
+        card.add(valueLabel, BorderLayout.CENTER);
+
+        return card;
+    }
+
+    // Обновленный метод createAdminStatsPanel - убрал иконки из вызовов createStatCard
+    private JPanel createAdminStatsPanel() {
+        JPanel statsPanel = new JPanel();
+        statsPanel.setLayout(new BoxLayout(statsPanel, BoxLayout.Y_AXIS));
+        statsPanel.setOpaque(false); // Прозрачный для темного фона
+
+        JLabel statsTitle = new JLabel("Общая статистика системы", SwingConstants.CENTER);
+        statsTitle.setFont(new Font("Segoe UI", Font.BOLD, 24)); // Изменен шрифт для consistency
+        statsTitle.setForeground(Color.WHITE); // Белый текст на темном фоне
+        statsTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JPanel cardsContainer = new JPanel();
+        cardsContainer.setLayout(new GridLayout(1, 4, 20, 0));
+        cardsContainer.setOpaque(false); // Прозрачный
+        cardsContainer.setMaximumSize(new Dimension(1000, 190));
+        cardsContainer.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        // Заглушки для статистики - в реальной системе здесь будут реальные данные
+        // Убрал иконки из вызовов
+        cardsContainer.add(createStatCard("Всего задач", "0", new Color(70, 130, 180)));
+        cardsContainer.add(createStatCard("Активных", "0", new Color(255, 165, 0)));
+        cardsContainer.add(createStatCard("Завершено", "0", new Color(46, 204, 113)));
+        cardsContainer.add(createStatCard("Пользователей", "0", new Color(155, 89, 182)));
+
+        statsPanel.add(statsTitle);
+        statsPanel.add(Box.createVerticalStrut(20));
+        statsPanel.add(cardsContainer);
+
+        return statsPanel;
+    }
+
+
+    private JPanel loadAllTasksPanel() {
+        JPanel allTasksPanel = new JPanel(new BorderLayout());
+        allTasksPanel.setBackground(Color.WHITE); // Белый фон основной панели
+        allTasksPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 20, 20));
+
+        JLabel titleLabel = new JLabel("Все задачи системы", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        titleLabel.setForeground(new Color(44, 62, 80)); // Темный цвет текста для белого фона
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+
+        JPanel filtersPanel = createAdminFiltersPanel();
+        allTasksPanel.add(filtersPanel, BorderLayout.NORTH);
+
+        JPanel loadingPanel = new JPanel(new BorderLayout());
+        loadingPanel.setBackground(Color.WHITE); // Белый фон панели загрузки
+        JLabel loadingLabel = new JLabel("Загрузка всех задач системы...", SwingConstants.CENTER);
+        loadingLabel.setFont(new Font("Segoe UI", Font.ITALIC, 16));
+        loadingLabel.setForeground(new Color(100, 100, 100)); // Серый цвет текста
+        loadingPanel.add(loadingLabel, BorderLayout.CENTER);
+
+        allTasksPanel.add(titleLabel, BorderLayout.NORTH);
+        allTasksPanel.add(loadingPanel, BorderLayout.CENTER);
+        loadAllTasksFromServer(allTasksPanel, loadingPanel);
+
+        return allTasksPanel;
+    }
+
+
+    private JPanel createAdminFiltersPanel() {
+        JPanel filtersPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 10));
+        filtersPanel.setBackground(Color.WHITE); // Белый фон панели фильтров
+        filtersPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(220, 220, 220)), // Светлая серая линия снизу
+                BorderFactory.createEmptyBorder(15, 20, 15, 20)
+        ));
+        filtersPanel.setPreferredSize(new Dimension(getWidth(), 80));
+
+        JLabel statusLabel = createFilterLabel("Статус:");
+        String[] statusOptions = {"Все статусы", "НЕ_НАЧАТА", "В_РАБОТЕ", "ЗАВЕРШЕНА", "НА_ДОРАБОТКЕ"};
+        adminStatusFilter = createModernComboBox(statusOptions);
+
+        JLabel importanceLabel = createFilterLabel("Важность:");
+        String[] importanceOptions = {"Все приоритеты", "СРОЧНАЯ", "НАДО_ПОТОРОПИТЬСЯ", "МОЖЕТ_ПОДОЖДАТЬ"};
+        adminImportanceFilter = createModernComboBox(importanceOptions);
+
+        JLabel sortLabel = createFilterLabel("Сортировка:");
+        String[] sortOptions = {"Без сортировки", "Дедлайн ↑", "Дедлайн ↓"};
+        adminSortFilter = createModernComboBox(sortOptions);
+
+        adminApplyFiltersButton = createModernFilterButton("Применить", new Color(52, 152, 219));
+        adminResetFiltersButton = createModernFilterButton("Сбросить", new Color(108, 117, 125));
+
+        adminApplyFiltersButton.addActionListener(e -> applyAdminFilters());
+        adminResetFiltersButton.addActionListener(e -> resetAdminFilters());
+
+        filtersPanel.add(statusLabel);
+        filtersPanel.add(adminStatusFilter);
+        filtersPanel.add(Box.createHorizontalStrut(10));
+        filtersPanel.add(importanceLabel);
+        filtersPanel.add(adminImportanceFilter);
+        filtersPanel.add(Box.createHorizontalStrut(10));
+        filtersPanel.add(sortLabel);
+        filtersPanel.add(adminSortFilter);
+        filtersPanel.add(Box.createHorizontalStrut(20));
+        filtersPanel.add(adminApplyFiltersButton);
+        filtersPanel.add(adminResetFiltersButton);
+
+        return filtersPanel;
+    }
+
+    private JLabel createFilterLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        label.setForeground(new Color(44, 62, 80)); // Темный цвет текста для белого фона
+        return label;
+    }
+
+    private JComboBox<String> createModernComboBox(String[] options) {
+        JComboBox<String> comboBox = new JComboBox<>(options);
+        comboBox.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        comboBox.setBackground(Color.WHITE); // Белый фон
+        comboBox.setForeground(new Color(44, 62, 80)); // Темный текст
+        comboBox.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)), // Светлая серая рамка
+                BorderFactory.createEmptyBorder(5, 8, 5, 8)
+        ));
+        comboBox.setFocusable(false);
+        comboBox.setMaximumRowCount(10);
+        comboBox.setPreferredSize(new Dimension(140, 30));
+        return comboBox;
+    }
+
+    private void loadAllTasksFromServer(JPanel allTasksPanel, JPanel loadingPanel) {
+        new Thread(() -> {
+            try {
+                List<User> users = getAllUsersWithTasks();
+                SwingUtilities.invokeLater(() -> {
+                    loadingPanel.removeAll();
+                    allTasksPanel.removeAll();
+                    allTasksPanel.setLayout(new BorderLayout());
+                    allTasksPanel.setBackground(Color.WHITE); // Убедитесь, что фон белый
+
+                    JLabel titleLabel = new JLabel("Все задачи системы", SwingConstants.CENTER);
+                    titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+                    titleLabel.setForeground(new Color(44, 62, 80));
+                    titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                    allTasksPanel.add(titleLabel, BorderLayout.NORTH);
+
+                    // Создаем панель фильтров
+                    JPanel filtersPanel = createAdminFiltersPanel();
+                    allTasksPanel.add(filtersPanel, BorderLayout.NORTH);
+
+                    if (users != null && !users.isEmpty()) {
+                        // ... остальной код без изменений
+                        originalAllAdminTasks = new ArrayList<>();
+                        for (User user : users) {
+                            if (user.getTasks() != null) {
+                                originalAllAdminTasks.addAll(user.getTasks());
+                            }
+                        }
+
+                        allAdminTasks = new ArrayList<>(originalAllAdminTasks);
+                        System.out.println("DEBUG: Loaded " + originalAllAdminTasks.size() + " tasks for admin");
+
+                        // Создаем панель для отображения задач с белым фоном
+                        JPanel tasksContentPanel = new JPanel(new BorderLayout());
+                        tasksContentPanel.setBackground(Color.WHITE);
+                        displayAllAdminTasks(tasksContentPanel, users);
+                        allTasksPanel.add(tasksContentPanel, BorderLayout.CENTER);
+                    } else {
+                        showNoTasksMessage(allTasksPanel);
+                        originalAllAdminTasks = new ArrayList<>();
+                        allAdminTasks = new ArrayList<>();
+                    }
+                    allTasksPanel.revalidate();
+                    allTasksPanel.repaint();
+                });
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    showErrorPanel(allTasksPanel, "Ошибка загрузки: " + e.getMessage());
+                    allTasksPanel.revalidate();
+                    allTasksPanel.repaint();
+                });
+            }
+        }).start();
+    }
+
     private void displayAllAdminTasks(JPanel allTasksPanel, List<User> users) {
         JPanel contentPanel = new JPanel();
         contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-        contentPanel.setBackground(Color.WHITE);
+        contentPanel.setBackground(Color.WHITE); // Белый фон контента
 
-        contentPanel.add(createAdminTableHeader()); // Теперь использует обновленный заголовок
+        contentPanel.add(createAdminTableHeader());
         contentPanel.add(Box.createVerticalStrut(10));
 
         int totalTasks = 0;
@@ -4814,7 +5197,7 @@ public class AdminApplicationFrame extends JFrame {
                 System.out.println("DEBUG: Displaying tasks for user: " + user.getUsername() +
                         " (" + user.getTasks().size() + " tasks)");
                 for (Task task : user.getTasks()) {
-                    addAdminTaskRow(contentPanel, task, user.getUsername()); // Теперь использует обновленный метод
+                    addAdminTaskRow(contentPanel, task, user.getUsername());
                     totalTasks++;
                     System.out.println("DEBUG: Added task: " + task.getTitle() +
                             " for user: " + user.getUsername());
@@ -4825,9 +5208,337 @@ public class AdminApplicationFrame extends JFrame {
         System.out.println("DEBUG: Total admin tasks displayed: " + totalTasks);
 
         JScrollPane scrollPane = new JScrollPane(contentPanel);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.setBorder(BorderFactory.createEmptyBorder()); // Убираем рамку скролл-панели
+        scrollPane.setBackground(Color.WHITE); // Белый фон скролл-панели
+        scrollPane.getViewport().setBackground(Color.WHITE); // Белый фон области просмотра
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         allTasksPanel.add(scrollPane, BorderLayout.CENTER);
+    }
+
+    private JPanel createAdminTableHeader() {
+        JPanel headerPanel = new JPanel(new GridLayout(1, 8, 10, 5));
+        headerPanel.setBackground(new Color(240, 240, 240)); // Светло-серый фон заголовка
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        headerPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+
+        String[] headers = {"Пользователь", "Название задачи", "Описание", "Статус", "Срочность", "Дедлайн", "Комментарии", "Действия"};
+        for (String header : headers) {
+            JLabel headerLabel = new JLabel(header);
+            headerLabel.setFont(new Font("Arial", Font.BOLD, 12));
+            headerLabel.setForeground(new Color(44, 62, 80)); // Темный цвет текста
+            headerPanel.add(headerLabel);
+        }
+
+        return headerPanel;
+    }
+
+    private void showUserManagement() {
+        JDialog userManagementDialog = new JDialog(this, "Управление пользователями", true);
+        userManagementDialog.setSize(1200, 800);
+        userManagementDialog.setLocationRelativeTo(this);
+        userManagementDialog.setLayout(new BorderLayout());
+        userManagementDialog.setResizable(true);
+
+        // Устанавливаем белый фон для всего диалога
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBackground(Color.WHITE);
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        // Заголовок
+        JPanel headerPanel = createUserManagementHeader();
+
+        // Панель с пользователями и задачами
+        JSplitPane splitPane = createUserManagementSplitPane();
+
+        // Панель действий
+        JPanel actionPanel = createUserManagementActionPanel(userManagementDialog);
+
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
+        mainPanel.add(splitPane, BorderLayout.CENTER);
+        mainPanel.add(actionPanel, BorderLayout.SOUTH);
+
+        userManagementDialog.add(mainPanel, BorderLayout.CENTER);
+        userManagementDialog.setVisible(true);
+    }
+
+    private JPanel createUserManagementHeader() {
+        JPanel headerPanel = new JPanel();
+        headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.Y_AXIS));
+        headerPanel.setBackground(Color.WHITE);
+        headerPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
+
+        JLabel iconLabel = new JLabel("👥", SwingConstants.CENTER);
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
+        iconLabel.setForeground(new Color(52, 152, 219)); // Синий цвет вместо фиолетового
+        iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel titleLabel = new JLabel("Управление пользователями", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        titleLabel.setForeground(new Color(44, 62, 80)); // Темный цвет текста
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel subtitleLabel = new JLabel("Управление пользователями и их задачами", SwingConstants.CENTER);
+        subtitleLabel.setFont(new Font("Arial", Font.PLAIN, 14));
+        subtitleLabel.setForeground(new Color(127, 140, 141)); // Серый цвет
+        subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        headerPanel.add(iconLabel);
+        headerPanel.add(Box.createVerticalStrut(10));
+        headerPanel.add(titleLabel);
+        headerPanel.add(Box.createVerticalStrut(5));
+        headerPanel.add(subtitleLabel);
+
+        return headerPanel;
+    }
+
+    private JSplitPane createUserManagementSplitPane() {
+        // Панель пользователей
+        JPanel usersPanel = new JPanel(new BorderLayout());
+        usersPanel.setBackground(Color.WHITE);
+        usersPanel.setBorder(BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)), // Светлая серая рамка
+                "Пользователи",
+                javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION,
+                javax.swing.border.TitledBorder.DEFAULT_POSITION,
+                new Font("Arial", Font.BOLD, 12),
+                new Color(44, 62, 80) // Темный цвет текста
+        ));
+
+        DefaultListModel<String> usersListModel = new DefaultListModel<>();
+        JList<String> usersList = new JList<>(usersListModel);
+        usersList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        usersList.setFont(new Font("Arial", Font.PLAIN, 12));
+        usersList.setBackground(Color.WHITE);
+        usersList.setForeground(new Color(44, 62, 80));
+        usersList.setSelectionBackground(new Color(52, 152, 219));
+        usersList.setSelectionForeground(Color.WHITE);
+
+        JScrollPane usersScrollPane = new JScrollPane(usersList);
+        usersScrollPane.setBorder(BorderFactory.createEmptyBorder());
+        usersScrollPane.getViewport().setBackground(Color.WHITE);
+        usersPanel.add(usersScrollPane, BorderLayout.CENTER);
+
+        // Панель задач выбранного пользователя
+        JPanel tasksPanel = new JPanel(new BorderLayout());
+        tasksPanel.setBackground(Color.WHITE);
+        tasksPanel.setBorder(BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)), // Светлая серая рамка
+                "Задачи пользователя",
+                javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION,
+                javax.swing.border.TitledBorder.DEFAULT_POSITION,
+                new Font("Arial", Font.BOLD, 12),
+                new Color(44, 62, 80) // Темный цвет текста
+        ));
+
+        // Используем таблицу вместо списка для задач
+        String[] columnNames = {"Название", "Статус", "Важность", "Дедлайн"};
+        DefaultTableModel tasksTableModel = new DefaultTableModel(columnNames, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+
+        JTable tasksTable = new JTable(tasksTableModel);
+        tasksTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tasksTable.setFont(new Font("Arial", Font.PLAIN, 12));
+        tasksTable.setBackground(Color.WHITE);
+        tasksTable.setForeground(new Color(44, 62, 80));
+        tasksTable.setRowHeight(25);
+        tasksTable.getTableHeader().setBackground(new Color(240, 240, 240));
+        tasksTable.getTableHeader().setForeground(new Color(44, 62, 80));
+        tasksTable.getTableHeader().setFont(new Font("Arial", Font.BOLD, 12));
+        tasksTable.setSelectionBackground(new Color(52, 152, 219));
+        tasksTable.setSelectionForeground(Color.WHITE);
+
+        // Добавляем кастомный рендерер для цветов дедлайна
+        tasksTable.setDefaultRenderer(Object.class, new DeadlineTableCellRenderer());
+
+        // Настраиваем ширину колонок
+        tasksTable.getColumnModel().getColumn(0).setPreferredWidth(200); // Название
+        tasksTable.getColumnModel().getColumn(1).setPreferredWidth(120); // Статус
+        tasksTable.getColumnModel().getColumn(2).setPreferredWidth(120); // Важность
+        tasksTable.getColumnModel().getColumn(3).setPreferredWidth(100); // Дедлайн
+
+        JScrollPane tasksScrollPane = new JScrollPane(tasksTable);
+        tasksScrollPane.setBorder(BorderFactory.createEmptyBorder());
+        tasksScrollPane.getViewport().setBackground(Color.WHITE);
+        tasksPanel.add(tasksScrollPane, BorderLayout.CENTER);
+
+        // Загрузка пользователей
+        loadUsers(usersListModel, tasksTableModel, tasksTable);
+
+        // Обработчик выбора пользователя
+        usersList.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                String selectedUser = usersList.getSelectedValue();
+                if (selectedUser != null && !selectedUser.startsWith("Пользователи не найдены") && !selectedUser.startsWith("Ошибка")) {
+                    loadUserTasks(selectedUser, tasksTableModel);
+                }
+            }
+        });
+
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, usersPanel, tasksPanel);
+        splitPane.setDividerLocation(300);
+        splitPane.setResizeWeight(0.3);
+        splitPane.setBorder(BorderFactory.createEmptyBorder());
+
+        return splitPane;
+    }
+
+
+    private JPanel createUserManagementActionPanel(JDialog parentDialog) {
+        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 10));
+        actionPanel.setBackground(Color.WHITE);
+        actionPanel.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
+
+        JButton deleteUserButton = new JButton("Удалить пользователя");
+        JButton deleteTaskButton = new JButton("Удалить задачу");
+        JButton reassignTaskButton = new JButton("Переназначить задачу");
+        JButton editTaskButton = new JButton("Редактировать задачу");
+        JButton closeButton = new JButton("Закрыть");
+
+        // Стилизуем кнопки в соответствии с общим дизайном
+        styleManagementButton(deleteUserButton, new Color(231, 76, 60)); // Красный
+        styleManagementButton(deleteTaskButton, new Color(231, 76, 60)); // Красный
+        styleManagementButton(reassignTaskButton, new Color(52, 152, 219)); // Синий
+        styleManagementButton(editTaskButton, new Color(241, 196, 15));   // Желтый
+        styleManagementButton(closeButton, new Color(108, 117, 125));     // Серый
+
+        // Обработчики действий с передачей parentDialog
+        deleteUserButton.addActionListener(e -> deleteSelectedUser(parentDialog));
+        deleteTaskButton.addActionListener(e -> deleteSelectedTask(parentDialog));
+        reassignTaskButton.addActionListener(e -> reassignSelectedTask(parentDialog));
+        editTaskButton.addActionListener(e -> editSelectedTask(parentDialog));
+        closeButton.addActionListener(e -> parentDialog.dispose());
+
+        actionPanel.add(deleteUserButton);
+        actionPanel.add(deleteTaskButton);
+        actionPanel.add(reassignTaskButton);
+        actionPanel.add(editTaskButton);
+        actionPanel.add(closeButton);
+
+        return actionPanel;
+    }
+
+    private void styleManagementButton(JButton button, Color color) {
+        button.setFont(new Font("Arial", Font.BOLD, 12));
+        button.setForeground(Color.WHITE);
+        button.setBackground(color);
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(color.darker(), 1),
+                BorderFactory.createEmptyBorder(10, 15, 10, 15)
+        ));
+        button.setFocusPainted(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(color.darker());
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(color);
+            }
+        });
+    }
+
+    private void createNewTask() {
+        // Создаем диалог как модальный
+        AssignTaskDialog dialog = new AssignTaskDialog(this, authToken);
+
+        // Обновляем стиль диалога создания задачи
+        updateAssignTaskDialogStyle(dialog);
+
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+        refreshAllData();
+    }
+
+    private void updateAssignTaskDialogStyle(JDialog dialog) {
+        // Устанавливаем белый фон для всего диалога
+        dialog.getContentPane().setBackground(Color.WHITE);
+
+        // Рекурсивно обновляем все компоненты
+        updateComponentStyles(dialog.getContentPane());
+    }
+
+    private void updateComponentStyles(Container container) {
+        for (Component comp : container.getComponents()) {
+            if (comp instanceof JPanel) {
+                JPanel panel = (JPanel) comp;
+                panel.setBackground(Color.WHITE);
+                panel.setForeground(new Color(44, 62, 80));
+                updateComponentStyles(panel);
+            } else if (comp instanceof JLabel) {
+                JLabel label = (JLabel) comp;
+                label.setForeground(new Color(44, 62, 80));
+            } else if (comp instanceof JTextField) {
+                JTextField textField = (JTextField) comp;
+                textField.setBackground(Color.WHITE);
+                textField.setForeground(new Color(44, 62, 80));
+                textField.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                        BorderFactory.createEmptyBorder(5, 8, 5, 8)
+                ));
+            } else if (comp instanceof JTextArea) {
+                JTextArea textArea = (JTextArea) comp;
+                textArea.setBackground(Color.WHITE);
+                textArea.setForeground(new Color(44, 62, 80));
+                textArea.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                        BorderFactory.createEmptyBorder(5, 8, 5, 8)
+                ));
+            } else if (comp instanceof JComboBox) {
+                JComboBox<?> comboBox = (JComboBox<?>) comp;
+                comboBox.setBackground(Color.WHITE);
+                comboBox.setForeground(new Color(44, 62, 80));
+                comboBox.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                        BorderFactory.createEmptyBorder(5, 8, 5, 8)
+                ));
+            } else if (comp instanceof JButton) {
+                JButton button = (JButton) comp;
+                if (!button.getBackground().equals(new Color(220, 53, 69))) { // Не перекрашиваем красные кнопки
+                    button.setBackground(new Color(52, 152, 219));
+                }
+                button.setForeground(Color.WHITE);
+                button.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(button.getBackground().darker(), 1),
+                        BorderFactory.createEmptyBorder(8, 15, 8, 15)
+                ));
+            }
+        }
+    }
+
+    private void loadUsers(DefaultListModel<String> usersListModel, DefaultTableModel tasksTableModel, JTable tasksTable) {
+        showLoadingDialog("Загрузка пользователей...");
+
+        new Thread(() -> {
+            try {
+                List<User> users = getAllUsersWithTasks();
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    usersListModel.clear();
+                    tasksTableModel.setRowCount(0);
+
+                    if (users != null && !users.isEmpty()) {
+                        for (User user : users) {
+                            usersListModel.addElement(user.getUsername());
+                        }
+                        System.out.println("DEBUG: Loaded " + users.size() + " users");
+                    } else {
+                        usersListModel.addElement("Пользователи не найдены");
+                    }
+                });
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    hideLoadingDialog();
+                    usersListModel.clear();
+                    usersListModel.addElement("Ошибка загрузки: " + e.getMessage());
+                    showErrorMessage("Ошибка загрузки пользователей: " + e.getMessage());
+                });
+            }
+        }).start();
     }
 }

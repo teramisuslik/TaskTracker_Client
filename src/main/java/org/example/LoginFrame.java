@@ -109,8 +109,8 @@ public class LoginFrame extends JFrame {
         formPanel.setLayout(new BoxLayout(formPanel, BoxLayout.Y_AXIS));
         formPanel.setMaximumSize(new Dimension(400, 400));
 
-        // Иконка пользователя
-        JLabel userIcon = new JLabel() {
+        // Иконка пользователя - ИСПРАВЛЕННАЯ ВЕРСИЯ
+        JLabel userIcon = new JLabel("👤") {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -122,7 +122,8 @@ public class LoginFrame extends JFrame {
                 g2.setPaint(gradient);
                 g2.fillOval(0, 0, getWidth(), getHeight());
 
-                g2.setFont(new Font("Segoe UI", Font.BOLD, 24));
+                // Отображаем смайлик как текст
+                g2.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 32));
                 g2.setColor(Color.WHITE);
                 FontMetrics fm = g2.getFontMetrics();
                 String icon = "👤";
@@ -145,29 +146,8 @@ public class LoginFrame extends JFrame {
         passwordField = createStyledPasswordField();
         passwordPanel.add(passwordField);
 
-        // Кнопка входа
-        loginButton = new JButton("Войти в систему") {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                // Фиолетовый градиент
-                GradientPaint gradient = new GradientPaint(0, 0, new Color(155, 89, 182),
-                        0, getHeight(), new Color(142, 68, 173));
-                g2.setPaint(gradient);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 25, 25);
-
-                g2.setColor(Color.WHITE);
-                g2.setFont(getFont());
-                FontMetrics fm = g2.getFontMetrics();
-                String text = getText();
-                int x = (getWidth() - fm.stringWidth(text)) / 2;
-                int y = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
-                g2.drawString(text, x, y);
-                g2.dispose();
-            }
-        };
+        // Кнопка входа - УПРОЩЕННАЯ ВЕРСИЯ БЕЗ АНИМАЦИЙ
+        loginButton = new JButton("Войти в систему");
         styleModernLoginButton(loginButton);
         loginButton.addActionListener(new LoginButtonListener());
 
@@ -185,7 +165,7 @@ public class LoginFrame extends JFrame {
         registrationPanel.add(questionLabel);
         registrationPanel.add(registerLabel);
 
-// Статусная строка
+        // Статусная строка
         statusLabel = new JLabel(" ");
         statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         statusLabel.setForeground(new Color(255, 255, 255, 180));
@@ -406,23 +386,28 @@ public class LoginFrame extends JFrame {
         return label;
     }
 
+    // ОБНОВЛЕННЫЙ МЕТОД СТИЛИЗАЦИИ КНОПКИ
     private void styleModernLoginButton(JButton button) {
         button.setPreferredSize(new Dimension(320, 50));
         button.setAlignmentX(Component.CENTER_ALIGNMENT);
         button.setFont(new Font("Segoe UI", Font.BOLD, 16));
         button.setForeground(Color.WHITE);
-        button.setBorder(BorderFactory.createEmptyBorder());
-        button.setContentAreaFilled(false);
+        button.setBackground(new Color(155, 89, 182));
+        button.setBorder(BorderFactory.createEmptyBorder(15, 0, 15, 0));
         button.setFocusPainted(false);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+        button.setContentAreaFilled(true);
 
+        // Убираем все эффекты при наведении, кроме смены курсора
         button.addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent evt) {
-                button.repaint();
+                // Только меняем курсор на руку
+                button.setCursor(new Cursor(Cursor.HAND_CURSOR));
             }
 
             public void mouseExited(MouseEvent evt) {
-                button.repaint();
+                // Возвращаем стандартный курсор
+                button.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
             }
         });
     }
@@ -470,115 +455,23 @@ public class LoginFrame extends JFrame {
         }
     }
 
-    // Обработчик кнопки входа
-    private class LoginButtonListener implements ActionListener {
-        @Override
-        public void actionPerformed(ActionEvent e) {
-            String username = usernameField.getText().trim();
-            String password = new String(passwordField.getPassword()).trim();
-
-            if (username.isEmpty() || password.isEmpty()) {
-                showStatus("Заполните все поля!", new Color(231, 76, 60));
-                shakeAnimation();
-                return;
+    private String extractTokenFromResponse(String response) {
+        try {
+            int tokenStart = response.indexOf("\"token\":\"") + 9;
+            if (tokenStart < 9) {
+                tokenStart = response.indexOf("\"token\": \"") + 10;
             }
 
-            loginButton.setEnabled(false);
-            showStatus("Подключаемся к серверу...", new Color(155, 89, 182));
-
-            // Анимация загрузки
-            startLoadingAnimation();
-
-            new Thread(() -> {
-                try {
-                    String response = sendLoginRequest(username, password);
-                    SwingUtilities.invokeLater(() -> {
-                        stopLoadingAnimation();
-                        handleServerResponse(response, username);
-                    });
-                } catch (Exception ex) {
-                    SwingUtilities.invokeLater(() -> {
-                        stopLoadingAnimation();
-                        showStatus("Ошибка соединения: " + ex.getMessage(), new Color(231, 76, 60));
-                        loginButton.setEnabled(true);
-                        shakeAnimation();
-                    });
+            if (tokenStart > 8) {
+                int tokenEnd = response.indexOf("\"", tokenStart);
+                if (tokenEnd > tokenStart) {
+                    return response.substring(tokenStart, tokenEnd);
                 }
-            }).start();
-        }
-
-        private String sendLoginRequest(String username, String password) throws IOException, InterruptedException {
-            String jsonBody = String.format(
-                    "{\"username\": \"%s\", \"password\": \"%s\"}",
-                    username, password
-            );
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(LOGIN_URL))
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-                    .timeout(Duration.ofSeconds(15))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            return response.body();
-        }
-
-        private void handleServerResponse(String response, String username) {
-            loginButton.setEnabled(true);
-
-            try {
-                if (response.contains("\"token\"")) {
-                    String token = extractTokenFromResponse(response);
-
-                    if (token != null && !token.isEmpty()) {
-                        saveToken(token);
-                        onAuthorizationSuccess(); // ← ВОТ ТУТ ВЫЗЫВАЕМ НАШ МЕТОД
-
-                        // Анимация успеха перед переходом
-                        successAnimation();
-
-                        Timer timer = new Timer(1000, evt -> {
-                            openMainApplicationFrame(token);
-                        });
-                        timer.setRepeats(false);
-                        timer.start();
-                    } else {
-                        showStatus("Токен не найден в ответе", new Color(231, 76, 60));
-                        shakeAnimation();
-                    }
-                } else if (response.contains("error") || response.contains("Unauthorized")) {
-                    showStatus("Неверный логин или пароль", new Color(231, 76, 60));
-                    shakeAnimation();
-                } else {
-                    showStatus("Неизвестный ответ от сервера", new Color(231, 76, 60));
-                    shakeAnimation();
-                }
-            } catch (Exception ex) {
-                showStatus("Ошибка обработки ответа", new Color(231, 76, 60));
-                shakeAnimation();
             }
+        } catch (Exception e) {
+            System.err.println("Ошибка извлечения токена: " + e.getMessage());
         }
-
-        private String extractTokenFromResponse(String response) {
-            try {
-                int tokenStart = response.indexOf("\"token\":\"") + 9;
-                if (tokenStart < 9) {
-                    tokenStart = response.indexOf("\"token\": \"") + 10;
-                }
-
-                if (tokenStart > 8) {
-                    int tokenEnd = response.indexOf("\"", tokenStart);
-                    if (tokenEnd > tokenStart) {
-                        return response.substring(tokenStart, tokenEnd);
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println("Ошибка извлечения токена: " + e.getMessage());
-            }
-            return null;
-        }
+        return null;
     }
 
     // Анимации
@@ -600,10 +493,6 @@ public class LoginFrame extends JFrame {
             }
         });
         shakeTimer.start();
-    }
-
-    private void successAnimation() {
-        loginButton.repaint();
     }
 
     private void openRegistrationFrame() {
@@ -629,7 +518,6 @@ public class LoginFrame extends JFrame {
         prefs.remove("jwt_token");
         System.out.println("Токен удален");
     }
-
 
     private void openMainApplicationFrame(String token) {
         Timer fadeOutTimer = new Timer(20, new ActionListener() {
@@ -808,42 +696,135 @@ public class LoginFrame extends JFrame {
         return registrationLabel;
     }
 
-
     private void showStatus(String message, Color color) {
         if (statusLabel != null) {
             statusLabel.setText(message);
             statusLabel.setForeground(color);
 
-            // Делаем метку невидимой когда текст пустой
-            statusLabel.setVisible(message != null && !message.trim().isEmpty());
+            // Всегда делаем метку видимой при установке текста
+            statusLabel.setVisible(true);
+
+            // Если сообщение пустое, скрываем метку
+            if (message == null || message.trim().isEmpty()) {
+                statusLabel.setVisible(false);
+            }
         }
     }
 
-    private void startLoadingAnimation() {
-        showStatus("Отправка данных на сервер", new Color(155, 89, 182));
-    }
 
-    private void stopLoadingAnimation() {
-        showStatus("", Color.BLACK);
-    }
+    private void handleServerResponse(String response, String username) {
+        loginButton.setEnabled(true);
 
-    private void removeDuplicateButtons() {
-        if (loginButton != null) {
-            // Просто скрываем кнопку вместо сложной логики поиска дубликатов
-            loginButton.setEnabled(false);
-            loginButton.setVisible(false);
+        try {
+            if (response.contains("\"token\"")) {
+                String token = extractTokenFromResponse(response);
+
+                if (token != null && !token.isEmpty()) {
+                    saveToken(token);
+                    onAuthorizationSuccess(); // Только один вызов
+
+                    Timer timer = new Timer(1000, evt -> {
+                        openMainApplicationFrame(token);
+                    });
+                    timer.setRepeats(false);
+                    timer.start();
+                } else {
+                    showStatus("Токен не найден в ответе", new Color(231, 76, 60));
+                    shakeAnimation();
+                }
+            } else if (response.contains("error") || response.contains("Unauthorized")) {
+                showStatus("Неверный логин или пароль", new Color(231, 76, 60));
+                shakeAnimation();
+            } else {
+                showStatus("Неизвестный ответ от сервера", new Color(231, 76, 60));
+                shakeAnimation();
+            }
+        } catch (Exception ex) {
+            showStatus("Ошибка обработки ответа", new Color(231, 76, 60));
+            shakeAnimation();
         }
     }
+
+
+    // ОБНОВЛЕННЫЙ ОБРАБОТЧИК УСПЕШНОЙ АВТОРИЗАЦИИ
     private void onAuthorizationSuccess() {
-        stopLoadingAnimation();
+        // УБРАЛ вызов stopLoadingAnimation()
         showStatus("Авторизация успешна!", new Color(46, 204, 113));
 
-        // Вместо скрытия кнопки меняем ее внешний вид
+        // Кнопка не меняет внешний вид, только становится неактивной
         if (loginButton != null) {
             loginButton.setEnabled(false);
-            loginButton.setText("✓ Авторизация успешна");
-            // Меняем цвет на успешный
-            loginButton.repaint();
+        }
+    }
+
+
+    // ОБНОВЛЕННЫЙ МЕТОД ДЛЯ КНОПКИ ВХОДА (убираем анимацию загрузки на кнопке)
+    private class LoginButtonListener implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            String username = usernameField.getText().trim();
+            String password = new String(passwordField.getPassword()).trim();
+
+            if (username.isEmpty() || password.isEmpty()) {
+                showStatus("Заполните все поля!", new Color(231, 76, 60));
+                shakeAnimation();
+                return;
+            }
+
+            loginButton.setEnabled(false);
+            // УБРАЛ надпись "Подключаемся к серверу..."
+
+            new Thread(() -> {
+                try {
+                    String response = sendLoginRequest(username, password);
+                    SwingUtilities.invokeLater(() -> {
+                        handleServerResponse(response, username);
+                    });
+                } catch (Exception ex) {
+                    SwingUtilities.invokeLater(() -> {
+                        showStatus("Ошибка соединения: " + ex.getMessage(), new Color(231, 76, 60));
+                        loginButton.setEnabled(true);
+                        shakeAnimation();
+                    });
+                }
+            }).start();
+        }
+
+        private String sendLoginRequest(String username, String password) throws IOException, InterruptedException {
+            String jsonBody = String.format(
+                    "{\"username\": \"%s\", \"password\": \"%s\"}",
+                    username, password
+            );
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(LOGIN_URL))
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .timeout(Duration.ofSeconds(15))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            return response.body();
+        }
+
+        private String extractTokenFromResponse(String response) {
+            try {
+                int tokenStart = response.indexOf("\"token\":\"") + 9;
+                if (tokenStart < 9) {
+                    tokenStart = response.indexOf("\"token\": \"") + 10;
+                }
+
+                if (tokenStart > 8) {
+                    int tokenEnd = response.indexOf("\"", tokenStart);
+                    if (tokenEnd > tokenStart) {
+                        return response.substring(tokenStart, tokenEnd);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Ошибка извлечения токена: " + e.getMessage());
+            }
+            return null;
         }
     }
 }
