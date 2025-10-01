@@ -1,13 +1,18 @@
 package org.example;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringSerializer;
+
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Future;
 
 public class KafkaTaskProducer {
     private final Producer<String, String> producer;
-    private static final String TOPIC = "task-assignments";
+    private static final String TASK_ASSIGNMENTS_TOPIC = "task-assignments";
+    private static final String TASK_DELETIONS_TOPIC = "task-deletions";
 
     public KafkaTaskProducer() {
         Properties props = new Properties();
@@ -24,8 +29,9 @@ public class KafkaTaskProducer {
         this.producer = new KafkaProducer<>(props);
     }
 
+    // Метод для отправки задач
     public void sendTask(String username, String taskJson) throws Exception {
-        ProducerRecord<String, String> record = new ProducerRecord<>(TOPIC, username, taskJson);
+        ProducerRecord<String, String> record = new ProducerRecord<>(TASK_ASSIGNMENTS_TOPIC, username, taskJson);
 
         // Синхронная отправка с обработкой результата
         Future<RecordMetadata> future = producer.send(record);
@@ -36,6 +42,30 @@ public class KafkaTaskProducer {
                     ", Offset: " + metadata.offset());
         } catch (Exception e) {
             throw new Exception("Ошибка отправки в Kafka: " + e.getMessage(), e);
+        }
+    }
+
+    // Метод для отправки удаления задач по ID
+    public void sendTaskDeletion(String username, Long taskId) throws Exception {
+        // Создаем JSON для удаления с ID
+        ObjectMapper objectMapper = new ObjectMapper();
+        Map<String, Object> deletionData = new HashMap<>();
+        deletionData.put("username", username);
+        deletionData.put("id", taskId); // Используем "id" как в TaskDeleteDto
+
+        String deletionJson = objectMapper.writeValueAsString(deletionData);
+
+        ProducerRecord<String, String> record = new ProducerRecord<>(TASK_DELETIONS_TOPIC, username, deletionJson);
+
+        // Синхронная отправка с обработкой результата
+        Future<RecordMetadata> future = producer.send(record);
+
+        try {
+            RecordMetadata metadata = future.get(); // Ждем подтверждения
+            System.out.println("Запрос на удаление отправлен в Kafka. Partition: " + metadata.partition() +
+                    ", Offset: " + metadata.offset() + ", User: " + username + ", Task ID: " + taskId);
+        } catch (Exception e) {
+            throw new Exception("Ошибка отправки удаления в Kafka: " + e.getMessage(), e);
         }
     }
 
