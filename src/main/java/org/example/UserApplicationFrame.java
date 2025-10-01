@@ -801,18 +801,20 @@ class UserApplicationFrame extends JFrame {
             int start = json.indexOf(searchStr);
             if (start != -1) {
                 start += searchStr.length();
-                int end = findStringEnd(json, start);
+                int end = json.indexOf("\"", start);
                 if (end != -1) {
                     return json.substring(start, end);
                 }
             }
 
-            // Пробуем найти значение без кавычек (числа, null, boolean)
+            // Пробуем найти числовое значение (без кавычек)
             searchStr = "\"" + key + "\":";
             start = json.indexOf(searchStr);
             if (start != -1) {
                 start += searchStr.length();
-                int end = findValueEnd(json, start);
+                int end = json.indexOf(",", start);
+                if (end == -1) end = json.indexOf("}", start);
+                if (end == -1) end = json.indexOf("]", start);
                 if (end != -1) {
                     String value = json.substring(start, end).trim();
                     // Убираем кавычки если они есть

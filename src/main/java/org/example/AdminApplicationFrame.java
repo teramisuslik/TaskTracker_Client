@@ -224,7 +224,7 @@ public class AdminApplicationFrame extends JFrame {
 
         JButton dashboardButton = new JButton("Главная");
         JButton allTasksButton = new JButton("Все задачи");
-        JButton manageUsersButton = new JButton("Управление пользователями и их задачами");
+        JButton manageUsersButton = new JButton("Управление");
         JButton createTaskButton = new JButton("Создать задачу");
 
         styleAdminButton(dashboardButton);
@@ -4665,76 +4665,6 @@ public class AdminApplicationFrame extends JFrame {
     }
 
 
-
-
-    private JPanel createModernTopPanel(String username) {
-        JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.setOpaque(false);
-        topPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
-
-        // Левая панель с информацией
-        JPanel leftPanel = new JPanel(new BorderLayout());
-        leftPanel.setOpaque(false);
-
-        // Панель информации
-        JPanel infoPanel = new JPanel();
-        infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
-        infoPanel.setOpaque(false);
-
-        JLabel welcomeLabel = new JLabel("Панель администратора");
-        welcomeLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        welcomeLabel.setForeground(Color.WHITE);
-        welcomeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JLabel userInfoLabel = new JLabel("Вы вошли как: " + username + " (ADMIN)");
-        userInfoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        userInfoLabel.setForeground(new Color(200, 200, 200));
-        userInfoLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        infoPanel.add(welcomeLabel);
-        infoPanel.add(Box.createVerticalStrut(5));
-        infoPanel.add(userInfoLabel);
-
-        // Панель кнопок
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        buttonPanel.setOpaque(false);
-        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
-
-        // Кнопки с переносом текста для длинных названий
-        JButton dashboardButton = createSimpleButton("Главная");
-        JButton allTasksButton = createSimpleButton("Все задачи");
-        JButton manageUsersButton = createMultiLineButton("Управление<br>пользователями"); // Перенос текста
-        JButton createTaskButton = createSimpleButton("Создать задачу");
-
-        dashboardButton.addActionListener(e -> showDashboard());
-        allTasksButton.addActionListener(e -> showAllTasks());
-        manageUsersButton.addActionListener(e -> showUserManagement());
-        createTaskButton.addActionListener(e -> createNewTask());
-
-        buttonPanel.add(dashboardButton);
-        buttonPanel.add(allTasksButton);
-        buttonPanel.add(manageUsersButton);
-        buttonPanel.add(createTaskButton);
-
-        leftPanel.add(infoPanel, BorderLayout.NORTH);
-        leftPanel.add(buttonPanel, BorderLayout.CENTER);
-
-        // Правая панель с кнопкой выхода
-        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        rightPanel.setOpaque(false);
-
-        JButton logoutButton = createSimpleButton("Выйти");
-        logoutButton.setBackground(new Color(220, 53, 69));
-        logoutButton.addActionListener(e -> showLogoutConfirmationDialog());
-
-        rightPanel.add(logoutButton);
-
-        topPanel.add(leftPanel, BorderLayout.CENTER);
-        topPanel.add(rightPanel, BorderLayout.EAST);
-
-        return topPanel;
-    }
-
     // Кнопка с переносом текста
     private JButton createMultiLineButton(String htmlText) {
         JButton button = new JButton();
@@ -5541,4 +5471,175 @@ public class AdminApplicationFrame extends JFrame {
             }
         }).start();
     }
+
+    private JPanel createModernTopPanel(String username) {
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.setOpaque(false);
+        topPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+
+        // Левая панель с информацией
+        JPanel leftPanel = new JPanel(new BorderLayout());
+        leftPanel.setOpaque(false);
+
+        // Панель информации
+        JPanel infoPanel = new JPanel();
+        infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
+        infoPanel.setOpaque(false);
+
+        JLabel welcomeLabel = new JLabel("Панель администратора");
+        welcomeLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        welcomeLabel.setForeground(Color.WHITE);
+        welcomeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel userInfoLabel = new JLabel("Вы вошли как: " + username + " (ADMIN)");
+        userInfoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        userInfoLabel.setForeground(new Color(200, 200, 200));
+        userInfoLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        infoPanel.add(welcomeLabel);
+        infoPanel.add(Box.createVerticalStrut(5));
+        infoPanel.add(userInfoLabel);
+
+        // Панель кнопок - ИСПРАВЛЕННАЯ ВЕРСИЯ
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        buttonPanel.setOpaque(false);
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
+
+        // Создаем кнопки одинакового размера
+        JButton dashboardButton = createUniformButton("Главная");
+        JButton allTasksButton = createUniformButton("Все задачи");
+        JButton manageUsersButton = createUniformButton("Управление ");
+        JButton createTaskButton = createUniformButton("Создать задачу");
+
+        dashboardButton.addActionListener(e -> showDashboard());
+        allTasksButton.addActionListener(e -> showAllTasks());
+        manageUsersButton.addActionListener(e -> showUserManagement());
+        createTaskButton.addActionListener(e -> createNewTask());
+
+        buttonPanel.add(dashboardButton);
+        buttonPanel.add(allTasksButton);
+        buttonPanel.add(manageUsersButton);
+        buttonPanel.add(createTaskButton);
+
+        leftPanel.add(infoPanel, BorderLayout.NORTH);
+        leftPanel.add(buttonPanel, BorderLayout.CENTER);
+
+        // Правая панель с кнопкой выхода
+        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        rightPanel.setOpaque(false);
+
+        JButton logoutButton = createUniformButton("Выйти");
+        logoutButton.setBackground(new Color(220, 53, 69));
+        logoutButton.setBorder(BorderFactory.createEmptyBorder(8, 15, 8, 15));
+
+        logoutButton.addActionListener(e -> showLogoutConfirmationDialog());
+
+        rightPanel.add(logoutButton);
+
+        topPanel.add(leftPanel, BorderLayout.CENTER);
+        topPanel.add(rightPanel, BorderLayout.EAST);
+
+        return topPanel;
+    }
+
+    // НОВЫЙ МЕТОД - создает кнопки одинакового размера
+    private JButton createUniformButton(String text) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        button.setForeground(Color.WHITE);
+        button.setBackground(new Color(30, 144, 255));
+        button.setFocusPainted(false);
+        button.setBorderPainted(true);
+        button.setContentAreaFilled(true);
+        button.setOpaque(true);
+
+        // Устанавливаем фиксированный размер для всех кнопок
+        Dimension buttonSize = new Dimension(180, 42);
+        button.setPreferredSize(buttonSize);
+        button.setMinimumSize(buttonSize);
+        button.setMaximumSize(buttonSize);
+
+        // Красивая рамка с закругленными углами
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(255, 255, 255, 100), 1),
+                BorderFactory.createEmptyBorder(10, 15, 10, 15)
+        ));
+
+        // Эффекты при наведении
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(button.getBackground().brighter());
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                if (button.getText().equals("Выйти")) {
+                    button.setBackground(new Color(220, 53, 69));
+                } else {
+                    button.setBackground(new Color(30, 144, 255));
+                }
+            }
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                button.setBackground(button.getBackground().darker());
+            }
+        });
+
+        return button;
+    }
+
+    // АЛЬТЕРНАТИВНЫЙ ВАРИАНТ - если нужны кнопки с переносом текста для длинных названий
+    private JButton createUniformButtonWithWrap(String text) {
+        JButton button = new JButton();
+
+        // Для длинного текста используем HTML с переносом
+        if (text.length() > 15) {
+            // Разбиваем длинный текст на две строки
+            String[] words = text.split(" ");
+            if (words.length >= 2) {
+                // Пробуем разбить по первому пробелу
+                String firstLine = words[0];
+                String secondLine = text.substring(firstLine.length()).trim();
+                button.setText("<html><center>" + firstLine + "<br>" + secondLine + "</center></html>");
+            } else {
+                button.setText("<html><center>" + text + "</center></html>");
+            }
+        } else {
+            button.setText(text);
+        }
+
+        button.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        button.setForeground(Color.WHITE);
+        button.setBackground(new Color(30, 144, 255));
+        button.setFocusPainted(false);
+        button.setBorderPainted(true);
+        button.setContentAreaFilled(true);
+        button.setOpaque(true);
+
+        // Немного выше для текста в две строки
+        Dimension buttonSize = new Dimension(180, 48);
+        button.setPreferredSize(buttonSize);
+        button.setMinimumSize(buttonSize);
+        button.setMaximumSize(buttonSize);
+
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(255, 255, 255, 100), 1),
+                BorderFactory.createEmptyBorder(8, 12, 8, 12)
+        ));
+
+        // Эффекты при наведении
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(button.getBackground().brighter());
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                if (button.getText().contains("Выйти")) {
+                    button.setBackground(new Color(220, 53, 69));
+                } else {
+                    button.setBackground(new Color(30, 144, 255));
+                }
+            }
+        });
+
+        return button;
+    }
+
+
 }
